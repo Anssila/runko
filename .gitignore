@@ -66,4 +66,6 @@ projects/ffe/*ini
 projects/ffe/*.txt
 projects/ffe/test-*
 
+unix-cpu/
+
 .cache/
