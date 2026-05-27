@@ -67,5 +67,6 @@ projects/ffe/*.txt
 projects/ffe/test-*
 
 unix-cpu/
+.vscode/
 
 .cache/

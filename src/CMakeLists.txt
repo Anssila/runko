@@ -33,13 +33,24 @@ set (IO_FILES
      ./runko/io/snapshots/mpiio_spectra.c++
     )
 
+set (VLV_FILES
+     ./runko/vlv/vlasov_grid.c++
+     )
 
+add_library(runko_vlv
+     ${VLV_FILES}
+     )
+target_link_libraries(runko_vlv
+    corgi
+    tyvi
+)
 pybind11_add_module(runko_cpp_bindings
     ./runko/bindings/runko_cpp_bindings.c++
     ${TOOLS_FILES}
     ${EMF_FILES}
     ${PIC_FILES}
     ${IO_FILES}
+    ${VLV_FILES}
 )
 
 target_link_libraries(runko_cpp_bindings

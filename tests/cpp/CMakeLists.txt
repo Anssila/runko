@@ -3,6 +3,7 @@
 
 set(TESTS_TO_RUN
     unit_testing
+    grid
 )
 
 foreach(test ${TESTS_TO_RUN})
@@ -20,6 +21,7 @@ foreach(test ${TESTS_TO_RUN})
         runko_includes
         runko_warnings
         runko_dependencies
+        runko_vlv
     )
 
     add_test(NAME "cpp-${test}" COMMAND "${test}.test")
