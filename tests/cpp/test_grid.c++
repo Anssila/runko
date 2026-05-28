@@ -4,7 +4,6 @@
 #include <boost/ut.hpp>
 #include "runko/mdgrid_common.h"
 #include "runko/vlv/vlasov_grid.h"
-
 namespace {
 
 using namespace boost::ut;
@@ -119,14 +118,54 @@ const suite<"dense grid testing"> s2 = [] {
 
   "shift"_test = [] {
     auto g = vlv::DenseGrid(5,4,5);
-    g.Shift(0.1f,0.2f,0.3f);
-    expect(g.GetDummy() == 0.6f);
+    g.SetDelta({0.1f,0.1f,0.1f});
+    g.Shift(0.1f,0.2f,0.3f, 1.0f);
+    expect(std::abs(static_cast<float>(g.GetDummy()) - 0.9f) < 1.0e-6f);
   };
 
   "initialize"_test = [] {
     auto g = vlv::DenseGrid(3,4,5);
     g.InitZero();
     expect(g.GetTotalFluid() == 0.0f);
+  };
+
+  "GetVelFromIndex"_test = [] {
+    auto g = vlv::DenseGrid(5,6,7);
+    g.SetInfty({2.0f,2.0f,2.0f});
+
+
+    auto approxEq = [] (vlv::VlasovGrid::value_type a, vlv::VlasovGrid::value_type b){
+        return std::abs(static_cast<float>(a-b)) < 1.0e-6f;
+    };
+
+    expect(approxEq(g.GetVelFromIndex(0,0),-2.0f));
+    expect(approxEq(g.GetVelFromIndex(0,1),-2.0f));
+    expect(approxEq(g.GetVelFromIndex(0,2),-2.0f));
+
+    expect(approxEq(g.GetVelFromIndex(4,0),2.0f));
+    expect(approxEq(g.GetVelFromIndex(5,1),2.0f));
+    expect(approxEq(g.GetVelFromIndex(6,2),2.0f));
+
+    expect(approxEq(g.GetVelFromIndex(2,0),0.0f));
+    expect(!approxEq(g.GetVelFromIndex(2,1),0.0f));
+    expect(approxEq(g.GetVelFromIndex(3,2),0.0f));
+  };
+
+  "GetIndexFromVel"_test = [] {
+    auto g = vlv::DenseGrid(5,6,7);
+    g.SetDelta({0.1f,0.1f,0.1f});
+    
+    expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(-0.2f),0) == 0);
+    expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(-0.25f),1) == 0);
+    expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(-0.3f),2) == 0);
+
+    expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.2f),0) == 4);
+    expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.25f),1) == 5);
+    expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.3f),2) == 6);
+
+    expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.0f),0) == 2);
+    expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.0f),1) == 2);
+    expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.0f),2) == 3);
   };
 };
 
