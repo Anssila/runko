@@ -43,6 +43,7 @@ add_library(runko_vlv
 target_link_libraries(runko_vlv
     corgi
     tyvi
+    runko_includes
 )
 pybind11_add_module(runko_cpp_bindings
     ./runko/bindings/runko_cpp_bindings.c++

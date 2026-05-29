@@ -27,7 +27,7 @@ private:
     // Shifts in the coordinate axes are private and virtual because they are used by the strang splitting
     // main shift function that is public (these shouldn't be directly accessed) and they are implemented in the 
     // actual implementations of the vlasov grid (dense grid / sparse grid ...)
-    virtual void Shift_dir(value_type dv, size_t ax = 0) = 0; // Shift the velocity space values in the ax-direction by dv
+    virtual void Shift_dir(value_type dv, size_t ax, const size_t order = 0) = 0; // Shift the velocity space values in the ax-direction by dv
 };
 
 
@@ -43,24 +43,28 @@ private:
     VelGrid *grid_, *new_grid_; // the actual grids that store the velocity space phase fluid 
     // new_grid_ is used to update values and the pointers are swapped every time
 
-    value_type dummy;
-
 public:
     DenseGrid(std::size_t Nx, std::size_t Ny, std::size_t Nz);
     ~DenseGrid(){
         delete grid_;
         delete new_grid_;
     }
-    value_type GetDummy() const {return dummy;}
+
     value_type GetTotalFluid() const override;
     void InitZero() override;
     void SetInfty(std::array<value_type,3> inftys); // Set the max value in the dense grid (infty_), sets deltaU accordingly based on extents
     void SetDelta(std::array<value_type,3> deltas); // Set the resolution of the dense grid (deltaU), sets infty accordingly based on extents
-    size_t GetIndexFromVel(value_type u, size_t ax = 0) const; // Helper function to get the index in the sparse grid corresponding to a velocity in the ax-direction
-    value_type GetVelFromIndex(size_t ind, size_t ax = 0) const; // Helper function to get the velocity (beta in the ax-direction) corresponding to an index in the sparse grid
+
+    std::array<size_t,3> GetIndFromVel(std::array<value_type,3> u) const; // Helper function to get the indicies corresponding to a velocity in the sparse grid
+    std::array<value_type,3> GetVelFromInd(std::array<size_t,3> inds) const; // Helper function to get the velocity corresponding to a set of indicies in the dense grid
 
 private:
-    void Shift_dir(value_type dv, size_t ax = 0) override; // Function for shifting in 1D along ax    
+    void Shift_dir(value_type dv, size_t ax, const size_t order=0) override; // Function for shifting in 1D along ax, interpolated to order "order"
+    
+    static constexpr value_type Interpolator(std::vector<value_type> &values, value_type t, const size_t order=0); // Values (2*order + 1) must be centered around the point relative to which t is measured, returns interpolation result to given order
+
+    size_t GetIndFromVel(value_type u, size_t ax) const; // Helper function to get the index in the dense grid corresponding to a velocity in the ax-direction
+    value_type GetVelFromInd(size_t ind, size_t ax) const; // Helper function to get the velocity (beta in the ax-direction) corresponding to an index in the dense grid
 };
 
 } // namespace vlv
