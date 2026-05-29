@@ -62,7 +62,7 @@ private:
     void Shift_dir(value_type dv, size_t ax, const size_t order=0) override; // Function for shifting in 1D along ax, interpolated to order "order"
     
     static constexpr value_type Interpolator(std::vector<value_type> &values, value_type t, const size_t order=0); // Values (2*order + 1) must be centered around the point relative to which t is measured, returns interpolation result to given order
-
+    inline static void ClampInds(std::array<size_t,3> &inds, std::array<size_t,3> ex);
     size_t GetIndFromVel(value_type u, size_t ax) const; // Helper function to get the index in the dense grid corresponding to a velocity in the ax-direction
     value_type GetVelFromInd(size_t ind, size_t ax) const; // Helper function to get the velocity (beta in the ax-direction) corresponding to an index in the dense grid
 };

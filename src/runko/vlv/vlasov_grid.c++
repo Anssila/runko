@@ -35,15 +35,21 @@ std::array<vlv::VlasovGrid::value_type,3> DenseGrid::GetVelFromInd(std::array<si
 
 void DenseGrid::SetDelta(std::array<value_type,3> deltas){
     deltaU_ = deltas;
-    for (int i = 0; i < 3; i++){
-        infty_[i] = static_cast<value_type>(extents_[i]-1) * static_cast<value_type>(0.5f) * deltaU_[i];
+    for (size_t i = 0; i < 3ul; i++){
+        infty_[i] = static_cast<value_type>(extents_[i]-1ul) * static_cast<value_type>(0.5f) * deltaU_[i];
     }
 }
 
 void DenseGrid::SetInfty(std::array<value_type,3> inftys){
     infty_ = inftys;
-    for (int i = 0; i < 3; i++){
-        deltaU_[i] = infty_[i] / static_cast<value_type>(extents_[i]-1) * static_cast<value_type>(2.0f);
+    for (size_t i = 0; i < 3ul; i++){
+        deltaU_[i] = infty_[i] / static_cast<value_type>(extents_[i]-1ul) * static_cast<value_type>(2.0f);
+    }
+}
+
+inline void DenseGrid::ClampInds(std::array<size_t,3> &inds, std::array<size_t,3> ex){
+    for (size_t ax = 0; ax < 3ul; ax++){
+        inds[ax] = std::max(std::min(inds[ax],ex[ax]-size_t{1}),size_t{0});
     }
 }
 
@@ -58,57 +64,49 @@ void DenseGrid::Shift_dir(value_type dv, size_t ax, [[maybe_unused]] const size_
     value_type min = std::floor(shift_ind); // the relative index of the cell with lower index we need to update
     value_type max = std::ceil(shift_ind); // the other relative index we need to update for every cell 
 
-    [[maybe_unused]] value_type t_min = shift_ind - max; // TODO why
-    [[maybe_unused]] value_type t_max = shift_ind - min; // TODO also does the interpolator work properly ?
+    value_type t_min = shift_ind - max; // TODO why
+    value_type t_max = shift_ind - min; // TODO also does the interpolator work properly ?
 
-    toolbox::Vec3 dir = {size_t{0},size_t{0},size_t{0}};
+    toolbox::Vec3 dir = toolbox::Vec3(size_t{0},size_t{0},size_t{0});
     dir[ax] = size_t{1};
 
     size_t min_ind = static_cast<size_t>(min);
     size_t max_ind = static_cast<size_t>(max);
 
-    [[maybe_unused]] auto min_vec = dir * min_ind; // relative position of min
-    [[maybe_unused]] auto max_vec = dir * max_ind; // relative position of max
+    auto min_rel = dir * min_ind; // relative position of min
+    auto max_rel = dir * max_ind; // relative position of max
 
     const auto w = tyvi::mdgrid_work{};
 
     w.sync_from_staging(grid).sync_from_staging(new_grid);
 
-    // [[maybe_unused]] auto kernel = [TYVI_CMDS(grid, new_grid), this, ax, dv, order](const auto& idx) {
+    std::array<size_t,3> ex = extents_;
+
+    auto kernel = [TYVI_CMDS(grid, new_grid), ax, min_rel, max_rel, t_min, t_max, order, ex](const auto& idx) {
         
-    //     toolbox::Vec3 id_vec = toolbox::Vec3(idx);
-    //     auto interpolation_values = std::vector<value_type>();
-    //     for (size_t i = 0; i < order+1; i++){
-    //         std::array<size_t,3> inds = idx;
-    //         inds[ax] += i - order/2;
-    //         interpolation_values.push_back(grid_mds[inds][]);
-    //     }
+        toolbox::Vec3 ind_vec = toolbox::Vec3(static_cast<size_t>(idx[0]),static_cast<size_t>(idx[1]),static_cast<size_t>(idx[2]));
+        auto interpolation_values = std::vector<value_type>();
+        for (size_t i = 0; i < order+1; i++){
+            std::array<size_t,3> inds = {idx[0],idx[1],idx[2]};
+            inds[ax] += i - order/2;
+            DenseGrid::ClampInds(inds, ex);
+            interpolation_values.push_back(grid_mds[inds][]);
+        }
 
-    //     auto float_dir = toolbox::Vec3(static_cast<value_type>(0.0f),static_cast<value_type>(0.0f),static_cast<value_type>(0.0f));
-    //     float_dir[ax] = static_cast<value_type>(1.0f);
+        auto min_vec = ind_vec + min_rel;
+        auto max_vec = ind_vec + max_rel;
 
-    //     auto v = toolbox::Vec3(GetVelFromIndex(idx));
-    //     auto new_v = v + float_dir * dv;
+        auto min_inds = std::array<size_t,3>{min_vec[0], min_vec[1], min_vec[2]};
+        auto max_inds = std::array<size_t,3>{max_vec[0], max_vec[1], max_vec[2]};
 
-    //     // we only need to consider two cells that this cell's fluid will end up in
-    //     auto first_vec  = id_vec + dir * (this->GetIndexFromVel(dv, ax) + 0); 
-    //     auto second_vec = id_vec + dir * (this->GetIndexFromVel(dv, ax) + 1); 
+        DenseGrid::ClampInds(min_inds, ex);
+        DenseGrid::ClampInds(max_inds, ex);
 
-    //     auto first_ind = std::array<size_t,3>{first_vec[0],first_vec[1],first_vec[2]};
-    //     auto second_ind = std::array<size_t,3>{second_vec[0],second_vec[1],second_vec[2]};
+        new_grid_mds[min_inds][] = Interpolator(interpolation_values, t_min, order); // TODO: Should Interpolator be an object instead?
+        new_grid_mds[max_inds][] = Interpolator(interpolation_values, t_max, order);
+    };
 
-    //     // Create an interpolator that can be used to interpolate the values to the new positions 
-    //     auto interp = [] (value_type t) {Interpolator(interpolation_values, t, order)}; // TODO should this be a proper object?
-
-    //     new_grid_mds[first_ind][] = interp()
-
-    //     for (int i = 0; i < 2; i++){ // we only need to loop over two cells for a linear interpolation scheme
-    //         auto pos = start + dir * static_cast<toolbox::arithmetic auto>(i);
-    //         std::array<size_t,3> inds = {pos[0], pos[1], pos[2]};
-    //         value_type overlap = dv - this->GetVelFromIndex(pos[ax],ax);
-    //         new_grid_mds[inds][] = grid_mds[idx][];
-    //     }
-    // };
+    w.for_each_index(new_grid, kernel).sync_to_staging(new_grid).wait();
 }
 
 constexpr vlv::VlasovGrid::value_type DenseGrid::Interpolator(std::vector<value_type> &values, value_type t, size_t order){
@@ -137,7 +135,7 @@ void DenseGrid::InitZero(){
     }
 }
 
-vlv::VlasovGrid::value_type DenseGrid::GetTotalFluid() const{
+vlv::VlasovGrid::value_type DenseGrid::GetTotalFluid() const{ // TODO: Should this use the device??
     const auto staging_mds = grid_->staging_mds();
     value_type tot = static_cast<value_type>(0.0f);
     for (const auto idx : tyvi::sstd::index_space(staging_mds)) {
