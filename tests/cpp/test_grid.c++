@@ -4,6 +4,7 @@
 #include <boost/ut.hpp>
 #include "runko/mdgrid_common.h"
 #include "runko/vlv/vlasov_grid.h"
+#include <iostream>
 namespace {
 
 using namespace boost::ut;
@@ -116,57 +117,64 @@ const suite<"dense grid testing"> s2 = [] {
     expect(true); 
   };
 
-//   "shift"_test = [] {
-//     auto g = vlv::DenseGrid(5,4,5);
-//     g.SetDelta({0.1f,0.1f,0.1f});
-//     g.Shift(0.1f,0.2f,0.3f, 1.0f);
-//     expect(std::abs(static_cast<float>(g.GetDummy()) - 0.9f) < 1.0e-6f);
-//   };
-
   "initialize"_test = [] {
     auto g = vlv::DenseGrid(3,4,5);
+    g.SetDelta({0.1f,0.1f,0.1f});
+    // Test zero initialization
+
     g.InitZero();
     expect(g.GetTotalFluid() == 0.0f);
+
+    // Test delta initialization
+    g.InitDelta({0.0f, 0.1f, -0.1f});
+    expect(g.GetTotalFluid() == 1.0f);
   };
 
-//   "GetVelFromIndex"_test = [] {
-//     auto g = vlv::DenseGrid(5,6,7);
-//     g.SetInfty({2.0f,2.0f,2.0f});
+  "shift"_test = [] {
+    auto g = vlv::DenseGrid(5,6,7);
+    g.SetDelta({0.1f,0.1f,0.1f});
 
+    // First test that zero fluid stays as zero
+    g.InitZero(); 
+    g.Shift(0.1f,0.2f,0.3f, 1.0f);
+    expect(std::abs(static_cast<float>(g.GetTotalFluid())) < 1.0e-6f);
 
-//     auto approxEq = [] (vlv::VlasovGrid::value_type a, vlv::VlasovGrid::value_type b){
-//         return std::abs(static_cast<float>(a-b)) < 1.0e-6f;
-//     };
+    // Test that a delta distribution conserves fluid under shifting
+    g.InitDelta({0.2f,0.2f,0.2f});
+    vlv::VlasovGrid::value_type tot = g.GetTotalFluid();
+    g.Shift(-0.2f, 0.1f, 0.5f, 1.0f);
+    std::cout << "Tot init: " << tot << "\nTot after shift: " << g.GetTotalFluid() << "\n";
+    expect(std::abs(static_cast<float>(tot - g.GetTotalFluid())) < 1.0e-6f);
+  };
 
-//     expect(approxEq(g.GetVelFromIndex(0,0),-2.0f));
-//     expect(approxEq(g.GetVelFromIndex(0,1),-2.0f));
-//     expect(approxEq(g.GetVelFromIndex(0,2),-2.0f));
+  "GetVelFromIndex"_test = [] {
+    auto g = vlv::DenseGrid(5,6,7);
+    g.SetInfty({2.0f,2.0f,2.0f});
 
-//     expect(approxEq(g.GetVelFromIndex(4,0),2.0f));
-//     expect(approxEq(g.GetVelFromIndex(5,1),2.0f));
-//     expect(approxEq(g.GetVelFromIndex(6,2),2.0f));
+    auto approxEq = [] (std::array<vlv::VlasovGrid::value_type,3> a, std::array<vlv::VlasovGrid::value_type,3> b){
+        return std::abs(static_cast<float>(a[0]-b[0])) < 1.0e-6f
+            && std::abs(static_cast<float>(a[1]-b[1])) < 1.0e-6f
+            && std::abs(static_cast<float>(a[2]-b[2])) < 1.0e-6f;
+    };
 
-//     expect(approxEq(g.GetVelFromIndex(2,0),0.0f));
-//     expect(!approxEq(g.GetVelFromIndex(2,1),0.0f));
-//     expect(approxEq(g.GetVelFromIndex(3,2),0.0f));
-//   };
+    expect(approxEq(g.GetVelFromInd({0,0,0}),{-2.0f,-2.0f,-2.0f}));
 
-//   "GetIndexFromVel"_test = [] {
-//     auto g = vlv::DenseGrid(5,6,7);
-//     g.SetDelta({0.1f,0.1f,0.1f});
-    
-//     expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(-0.2f),0) == 0);
-//     expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(-0.25f),1) == 0);
-//     expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(-0.3f),2) == 0);
+    expect(approxEq(g.GetVelFromInd({4,5,6}),{2.0f,2.0f,2.0f}));
 
-//     expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.2f),0) == 4);
-//     expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.25f),1) == 5);
-//     expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.3f),2) == 6);
+    expect(approxEq(g.GetVelFromInd({2,0,3}),{0.0f,-2.0f,0.0f}));
+    expect(!approxEq(g.GetVelFromInd({0,2,0}),{-2.0f,0.0f,-2.0f}));
+  };
 
-//     expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.0f),0) == 2);
-//     expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.0f),1) == 2);
-//     expect(g.GetIndexFromVel(static_cast<vlv::VlasovGrid::value_type>(0.0f),2) == 3);
-//   };
+  "GetIndexFromVel"_test = [] {
+    auto g = vlv::DenseGrid(5,6,7);
+    g.SetDelta({0.1f,0.1f,0.1f});
+
+    expect(g.GetIndFromVel({-0.2f,-0.25f,-0.3f}) == std::array<runko::index_t,3>{0,0,0});
+
+    expect(g.GetIndFromVel({0.2f,0.25f,0.3f}) == std::array<runko::index_t,3>{4,5,6});
+
+    expect(g.GetIndFromVel({0.0f,0.0f,0.0f}) == std::array<runko::index_t,3>{2,2,3});
+  };
 };
 
 }  // namespace
