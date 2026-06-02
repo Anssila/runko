@@ -60,10 +60,16 @@ public:
     std::array<runko::index_t,3> GetIndFromVel(std::array<value_type,3> u) const; // Helper function to get the indicies corresponding to a velocity in the sparse grid
     std::array<value_type,3> GetVelFromInd(std::array<runko::index_t,3> inds) const; // Helper function to get the velocity corresponding to a set of indicies in the dense grid
 
+    value_type DebugGetFluid(std::array<runko::index_t,3> inds) const; // Debug function to get the fluid in a grid cell
+    auto GetMDS() const { return grid_->staging_mds(); }
+    void DebugTestGrid();
+    std::vector<value_type> DebugGetGrid() const;
+
 private:
     void Shift_dir(value_type dv, runko::index_t ax, const runko::index_t order=0) override; // Function for shifting in 1D along ax, interpolated to order "order"
     
-    static constexpr value_type Interpolator(std::vector<value_type> &values, value_type t, const runko::index_t order=0); // Values (2*order + 1) must be centered around the point relative to which t is measured, returns interpolation result to given order
+    // Values (2*order + 1) must be centered around the point relative to which t is measured, returns interpolation result to given order
+    static constexpr value_type Interpolator(std::vector<value_type> &values, value_type t, const runko::index_t order=0); 
     inline static void ClampInds(std::array<runko::index_t,3> &inds, std::array<runko::index_t,3> ex);
     runko::index_t GetIndFromVel(value_type u, runko::index_t ax) const; // Helper function to get the index in the dense grid corresponding to a velocity in the ax-direction
     value_type GetVelFromInd(runko::index_t ind, runko::index_t ax) const; // Helper function to get the velocity (beta in the ax-direction) corresponding to an index in the dense grid
