@@ -4,8 +4,8 @@ namespace vlv{
 
 DenseGrid::DenseGrid(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz){
     extents_ = {Nx, Ny, Nz};
-    grid_ = new VelGrid(Nx, Ny, Nz);
-    new_grid_ = new VelGrid(Nx, Ny, Nz);
+    grid_ = std::make_unique<VelGrid>(Nx, Ny, Nz);
+    new_grid_ = std::make_unique<VelGrid>(Nx, Ny, Nz);
 };
 
 runko::index_t DenseGrid::GetIndFromVel(value_type u, runko::index_t ax) const {
@@ -77,11 +77,6 @@ void DenseGrid::Shift_dir(value_type dv, runko::index_t ax, const runko::index_t
     auto max_rel = dir * max_ind; // relative position of max
 
     const auto w = tyvi::mdgrid_work{};
-    const auto [w_old, w_new] = w.split<2>();
-
-    w_old.sync_from_staging(grid);
-    w_new.sync_from_staging(new_grid);
-    tyvi::when_all(w_old, w_new);
 
     std::array<runko::index_t,3> extents = extents_;
 
@@ -110,36 +105,23 @@ void DenseGrid::Shift_dir(value_type dv, runko::index_t ax, const runko::index_t
             new_grid_mds[max_inds][] += Interpolator(interpolation_values, t_max, order);
     };
 
-    w_old.for_each_index(new_grid, std::move(kernel)).sync_to_staging(new_grid);
+    w.for_each_index(new_grid, std::move(kernel));
 
-    w_old.for_each_index(grid, [TYVI_CMDS(grid, new_grid)] (const auto& idx){ // Set grid to zeros in order to have a clean new_grid after the swap
+    w.for_each_index(grid, [TYVI_CMDS(grid, new_grid)] (const auto& idx){ // Set grid to zeros in order to have a clean new_grid after the swap
         grid_mds[idx][] = static_cast<value_type>(0.0f);
     });
 
-    w_old.sync_to_staging(grid).sync_to_staging(new_grid).wait();
-    tyvi::when_all(w_old, w_new);
-
+    w.wait();
     std::swap(grid_, new_grid_);
 }
 
-void DenseGrid::DebugTestGrid(){
-    auto& grid = *grid_;
-
+vlv::VlasovGrid::value_type DenseGrid::DebugGetFluid(std::array<runko::index_t,3> inds) const{ // This function is inefficient; don't use for anything important
     const auto w = tyvi::mdgrid_work{};
-
-    w.sync_from_staging(grid).for_each_index(grid, [TYVI_CMDS(grid)](const auto& idx){
-        grid_mds[idx][] = static_cast<value_type>(0.0f);
-    });
-
-    w.sync_to_staging(grid).wait();
-    std::swap(grid_, new_grid_);
-}
-
-vlv::VlasovGrid::value_type DenseGrid::DebugGetFluid(std::array<runko::index_t,3> inds) const{
+    w.sync_to_staging(*grid_).sync_to_staging(*new_grid_).wait();
     return grid_->staging_mds()[inds][];
 }
 
-std::vector<vlv::VlasovGrid::value_type> DenseGrid::DebugGetGrid() const{
+std::vector<vlv::VlasovGrid::value_type> DenseGrid::DebugGetGrid() const{ // TODO: do this properly using the device buffer
     const auto staging_mds = grid_->staging_mds();
     std::vector<value_type> g;
     for (const auto idx : tyvi::sstd::index_space(staging_mds)){
@@ -176,6 +158,9 @@ void DenseGrid::InitZero(){
     for (const auto idx : tyvi::sstd::index_space(new_staging_mds)) {
         new_staging_mds[idx][] = static_cast<value_type>(0.0f);
     }
+
+    const auto w = tyvi::mdgrid_work{};
+    w.sync_from_staging(*grid_).sync_from_staging(*new_grid_).wait();
 }
 
 void DenseGrid::InitDelta(std::array<value_type,3> v){
@@ -192,9 +177,14 @@ void DenseGrid::InitDelta(std::array<value_type,3> v){
     for (const auto idx : tyvi::sstd::index_space(new_staging_mds)) {
         new_staging_mds[idx][] = static_cast<value_type>(0.0f); // idx == v_inds ? 1.0f : 
     }
+
+    const auto w = tyvi::mdgrid_work{};
+    w.sync_from_staging(*grid_).sync_from_staging(*new_grid_).wait();
 }
 
-vlv::VlasovGrid::value_type DenseGrid::GetTotalFluid() const{ // TODO: Should this use the device??
+vlv::VlasovGrid::value_type DenseGrid::DebugGetTotalFluid() const{
+    const auto w = tyvi::mdgrid_work{};
+    w.sync_to_staging(*grid_).sync_to_staging(*new_grid_).wait();
     const auto staging_mds = grid_->staging_mds();
     value_type tot = static_cast<value_type>(0.0f);
     for (const auto idx : tyvi::sstd::index_space(staging_mds)) {

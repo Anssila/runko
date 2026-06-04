@@ -22,7 +22,7 @@ public:
     } 
     virtual void InitZero() = 0; // Function to initialize the velocity distribution to zeros
     virtual void InitDelta(std::array<value_type,3> v) = 0;  // Function to initialize the velocity distribution to a delta function around the specified velocity v
-    virtual value_type GetTotalFluid() const = 0;
+    virtual value_type DebugGetTotalFluid() const = 0;
 
 private: 
     // Shifts in the coordinate axes are private and virtual because they are used by the strang splitting
@@ -41,17 +41,12 @@ private:
     std::array<runko::index_t, 3> extents_;
     std::array<value_type, 3> infty_; // The max value for u that can be stored in the dense grid, for each axis
     std::array<value_type, 3> deltaU_; // The resolution for u, i.e. what is the difference in u of neighboring cells of the dense grid, for each axis
-    VelGrid *grid_, *new_grid_; // the actual grids that store the velocity space phase fluid 
+    std::unique_ptr<VelGrid> grid_, new_grid_; // the actual grids that store the velocity space phase fluid 
     // new_grid_ is used to update values and the pointers are swapped every time
 
 public:
     DenseGrid(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz);
-    ~DenseGrid(){
-        delete grid_;
-        delete new_grid_;
-    }
 
-    value_type GetTotalFluid() const override;
     void InitZero() override;
     void InitDelta(std::array<value_type,3>) override;
     void SetInfty(std::array<value_type,3> inftys); // Set the max value in the dense grid (infty_), sets deltaU accordingly based on extents
@@ -60,9 +55,9 @@ public:
     std::array<runko::index_t,3> GetIndFromVel(std::array<value_type,3> u) const; // Helper function to get the indicies corresponding to a velocity in the sparse grid
     std::array<value_type,3> GetVelFromInd(std::array<runko::index_t,3> inds) const; // Helper function to get the velocity corresponding to a set of indicies in the dense grid
 
+    value_type DebugGetTotalFluid() const override;
     value_type DebugGetFluid(std::array<runko::index_t,3> inds) const; // Debug function to get the fluid in a grid cell
     auto GetMDS() const { return grid_->staging_mds(); }
-    void DebugTestGrid();
     std::vector<value_type> DebugGetGrid() const;
 
 private:
