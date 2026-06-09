@@ -163,6 +163,10 @@ const suite<"dense grid testing"> s2 = [] {
     g.Shift(1.0f,1.0f,1.0f,-0.2f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
     expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({2,2,2}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({2,2,2});
+    g.Shift(-2.0f, -2.0f, -2.0f, 1.0f);
+    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
+    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({0,0,0}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({0,0,0});
+    
 
     g.InitDelta({0.0f,0.0f,0.0f});
     g.Shift(0.03f,-0.01f,0.18f,1.0f);

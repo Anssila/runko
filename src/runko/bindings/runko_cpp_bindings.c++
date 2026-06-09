@@ -29,5 +29,9 @@ PYBIND11_MODULE(runko_cpp_bindings, m_base) {
   /// pic
   py::module m_pic = m_base.def_submodule("pic", "pic module");
   pic::bind_pic(m_pic);
+
+  /// vlv
+  py::module m_vlv = m_base.def_submodule("vlv", "vlv module");
+  vlv::bind_vlv(m_vlv);
 }
 

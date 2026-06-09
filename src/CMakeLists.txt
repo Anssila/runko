@@ -34,11 +34,13 @@ set (IO_FILES
     )
 
 set (VLV_FILES
+     ./runko/bindings/pyvlv.c++
      ./runko/vlv/vlasov_grid.c++
+     ./runko/vlv/tile.c++
      )
 
 add_library(runko_vlv
-     ${VLV_FILES}
+     ./runko/vlv/vlasov_grid.c++
      )
 target_link_libraries(runko_vlv
     corgi

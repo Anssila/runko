@@ -47,9 +47,11 @@ void DenseGrid::SetInfty(std::array<value_type,3> inftys){
     }
 }
 
-inline void DenseGrid::ClampInds(std::array<runko::index_t,3> &inds, std::array<runko::index_t,3> extents){
+inline void DenseGrid::ClampInds(std::array<int32_t,3> &inds, std::array<runko::index_t,3> extents){
     for (size_t ax = 0; ax < 3ul; ax++){
-        inds[ax] = sstd::clamp(inds[ax],runko::index_t{0},extents[ax]-runko::index_t{1});
+        int32_t val = inds[ax];
+        int32_t max = extents[ax];
+        inds[ax] = sstd::clamp(val,0,max-1);
     }
 }
 
@@ -57,21 +59,18 @@ void DenseGrid::Shift_dir(value_type dv, runko::index_t ax, const runko::index_t
     auto& grid = *grid_;
     auto& new_grid = *new_grid_;
 
-    // const auto s_grid = grid.staging_mds();
-    // const auto s_new = new_grid.staging_mds();
-
     value_type shift_ind = dv / deltaU_[ax]; // how many indicies we shift by
-    value_type min = std::floor(shift_ind); // the relative index of the cell with lower index we need to update
-    value_type max = std::ceil(shift_ind); // the other relative index we need to update for every cell 
+    value_type min = sstd::floor(shift_ind); // the relative index of the cell with lower index we need to update
+    value_type max = sstd::ceil(shift_ind); // the other relative index we need to update for every cell 
 
     value_type t_min = min - shift_ind; 
     value_type t_max = max - shift_ind; 
 
-    toolbox::Vec3 dir = toolbox::Vec3(runko::index_t{0},runko::index_t{0},runko::index_t{0});
-    dir[ax] = runko::index_t{1};
+    toolbox::Vec3 dir = toolbox::Vec3(int32_t{0},int32_t{0},int32_t{0});
+    dir[ax] = int32_t{1};
 
-    runko::index_t min_ind = static_cast<runko::index_t>(min);
-    runko::index_t max_ind = static_cast<runko::index_t>(max);
+    int32_t min_ind = static_cast<int32_t>(min);
+    int32_t max_ind = static_cast<int32_t>(max);
 
     auto min_rel = dir * min_ind; // relative position of min
     auto max_rel = dir * max_ind; // relative position of max
@@ -82,11 +81,11 @@ void DenseGrid::Shift_dir(value_type dv, runko::index_t ax, const runko::index_t
 
     auto kernel = [TYVI_CMDS(grid, new_grid), ax, min_rel, max_rel, t_min, t_max, order, extents, min_ind, max_ind] (const auto& idx) { // 
         
-        toolbox::Vec3 ind_vec = toolbox::Vec3(static_cast<runko::index_t>(idx[0]),static_cast<runko::index_t>(idx[1]),static_cast<runko::index_t>(idx[2]));
+        toolbox::Vec3 ind_vec = toolbox::Vec3(static_cast<int32_t>(idx[0]),static_cast<int32_t>(idx[1]),static_cast<int32_t>(idx[2]));
         auto interpolation_values = std::vector<value_type>();
-        for (runko::index_t i = 0; i < order+1; i++){
-            std::array<runko::index_t,3> inds = {idx[0],idx[1],idx[2]};
-            inds[ax] += i - order/2;
+        for (int32_t i = 0; i < static_cast<int32_t>(order)+1; i++){
+            std::array<int32_t,3> inds = {static_cast<int32_t>(idx[0]),static_cast<int32_t>(idx[1]),static_cast<int32_t>(idx[2])};
+            inds[ax] += i - static_cast<int32_t>(order)/2;
             DenseGrid::ClampInds(inds, extents);
             interpolation_values.push_back(grid_mds[inds][]);
         }
@@ -94,8 +93,8 @@ void DenseGrid::Shift_dir(value_type dv, runko::index_t ax, const runko::index_t
         auto min_vec = ind_vec + min_rel;
         auto max_vec = ind_vec + max_rel;
 
-        auto min_inds = std::array<runko::index_t,3>{min_vec[0], min_vec[1], min_vec[2]};
-        auto max_inds = std::array<runko::index_t,3>{max_vec[0], max_vec[1], max_vec[2]};
+        auto min_inds = std::array<int32_t,3>{min_vec[0], min_vec[1], min_vec[2]};
+        auto max_inds = std::array<int32_t,3>{max_vec[0], max_vec[1], max_vec[2]};
 
         DenseGrid::ClampInds(min_inds, extents);
         DenseGrid::ClampInds(max_inds, extents);
@@ -181,6 +180,23 @@ void DenseGrid::InitDelta(std::array<value_type,3> v){
     const auto w = tyvi::mdgrid_work{};
     w.sync_from_staging(*grid_).sync_from_staging(*new_grid_).wait();
 }
+
+
+void DenseGrid::SetGridData(VlasovGrid::VelocityDistributionFunction distribution) {
+    const auto staging_mds = grid_->staging_mds();
+    
+    for (const auto idx : tyvi::sstd::index_space(staging_mds)) {
+        auto v = GetVelFromInd(idx);
+        double x = static_cast<double>(v[0]);
+        double y = static_cast<double>(v[1]);
+        double z = static_cast<double>(v[2]);
+        staging_mds[idx][] = static_cast<value_type>(distribution(x,y,z));
+    }
+
+    const auto w = tyvi::mdgrid_work{};
+    w.sync_from_staging(*grid_).wait();
+}
+
 
 vlv::VlasovGrid::value_type DenseGrid::DebugGetTotalFluid() const{
     const auto w = tyvi::mdgrid_work{};

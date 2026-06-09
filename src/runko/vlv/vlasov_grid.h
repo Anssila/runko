@@ -4,18 +4,20 @@
 
 namespace vlv{
 
+
 // Base class for different kinds of vlasov grid implementations
 class VlasovGrid{
 public:
     using value_type = float;
+    using VelocityDistributionFunction = std::function<double(double, double, double)>;
 
 protected:
     value_type deltaV_; // The spacing / resolution of the velocity space discretization
-
 public: 
     // implement shift operator using strang-splitting
     void Shift(value_type dx, value_type dy, value_type dz, value_type dt){
-        // TODO do correct strang-splitting, for now just do full shift sequentially for every dir
+        // TODO do correct strang-splitting, for now just do full shift sequentially for every dir 
+        // TODO or should shift be done fully 3d?
         Shift_dir(dx*dt, 0);
         Shift_dir(dy*dt, 1);
         Shift_dir(dz*dt, 2);
@@ -23,6 +25,7 @@ public:
     virtual void InitZero() = 0; // Function to initialize the velocity distribution to zeros
     virtual void InitDelta(std::array<value_type,3> v) = 0;  // Function to initialize the velocity distribution to a delta function around the specified velocity v
     virtual value_type DebugGetTotalFluid() const = 0;
+    virtual void SetGridData(VelocityDistributionFunction distribution) = 0;
 
 private: 
     // Shifts in the coordinate axes are private and virtual because they are used by the strang splitting
@@ -52,12 +55,17 @@ public:
     void SetInfty(std::array<value_type,3> inftys); // Set the max value in the dense grid (infty_), sets deltaU accordingly based on extents
     void SetDelta(std::array<value_type,3> deltas); // Set the resolution of the dense grid (deltaU), sets infty accordingly based on extents
 
+    void SetGridData(VelocityDistributionFunction distribution) override;
+
     std::array<runko::index_t,3> GetIndFromVel(std::array<value_type,3> u) const; // Helper function to get the indicies corresponding to a velocity in the sparse grid
     std::array<value_type,3> GetVelFromInd(std::array<runko::index_t,3> inds) const; // Helper function to get the velocity corresponding to a set of indicies in the dense grid
 
     value_type DebugGetTotalFluid() const override;
     value_type DebugGetFluid(std::array<runko::index_t,3> inds) const; // Debug function to get the fluid in a grid cell
-    auto GetMDS() const { return grid_->staging_mds(); }
+    auto GetStagingMDS() const { return grid_->staging_mds(); }
+    auto GetMDS() const { return grid_->mds(); }
+    auto GetExtents() const { return extents_; }
+    // auto GetUnderlyingBuffer const { return grid_->span(); }
     std::vector<value_type> DebugGetGrid() const;
 
 private:
@@ -65,7 +73,7 @@ private:
     
     // Values (2*order + 1) must be centered around the point relative to which t is measured, returns interpolation result to given order
     static constexpr value_type Interpolator(std::vector<value_type> &values, value_type t, const runko::index_t order=0); 
-    inline static void ClampInds(std::array<runko::index_t,3> &inds, std::array<runko::index_t,3> ex);
+    inline static void ClampInds(std::array<int32_t,3> &inds, std::array<runko::index_t,3> ex);
     runko::index_t GetIndFromVel(value_type u, runko::index_t ax) const; // Helper function to get the index in the dense grid corresponding to a velocity in the ax-direction
     value_type GetVelFromInd(runko::index_t ind, runko::index_t ax) const; // Helper function to get the velocity (beta in the ax-direction) corresponding to an index in the dense grid
 };
