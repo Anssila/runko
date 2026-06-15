@@ -2,7 +2,7 @@
 #include "runko/tools/vector.h"
 namespace vlv{
 
-DenseGrid::DenseGrid(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz){
+void DenseGrid::SetSize(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz){
     extents_ = {Nx, Ny, Nz};
     grid_ = std::make_unique<VelGrid>(Nx, Ny, Nz);
     new_grid_ = std::make_unique<VelGrid>(Nx, Ny, Nz);

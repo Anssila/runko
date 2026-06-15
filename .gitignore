@@ -43,6 +43,7 @@ compile_commands.json
 #
 *.png
 *.pdf
+*.gif
 
 */*/runs
 *.zip

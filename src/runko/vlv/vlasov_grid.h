@@ -26,6 +26,10 @@ public:
     virtual void InitDelta(std::array<value_type,3> v) = 0;  // Function to initialize the velocity distribution to a delta function around the specified velocity v
     virtual value_type DebugGetTotalFluid() const = 0;
     virtual void SetGridData(VelocityDistributionFunction distribution) = 0;
+    virtual void SetSize(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) = 0;
+    virtual void SetInfty(std::array<value_type,3> inftys) = 0; // Set the max value in the dense grid (infty_), sets deltaU accordingly based on extents
+    virtual void SetDelta(std::array<value_type,3> deltas) = 0; // Set the resolution of the dense grid (deltaU), sets infty accordingly based on extents
+
 
 private: 
     // Shifts in the coordinate axes are private and virtual because they are used by the strang splitting
@@ -48,12 +52,15 @@ private:
     // new_grid_ is used to update values and the pointers are swapped every time
 
 public:
-    DenseGrid(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz);
+    DenseGrid() = default;
+    DenseGrid(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) { SetSize(Nx,Ny,Nz); }
+
+    void SetSize(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) override;
 
     void InitZero() override;
     void InitDelta(std::array<value_type,3>) override;
-    void SetInfty(std::array<value_type,3> inftys); // Set the max value in the dense grid (infty_), sets deltaU accordingly based on extents
-    void SetDelta(std::array<value_type,3> deltas); // Set the resolution of the dense grid (deltaU), sets infty accordingly based on extents
+    void SetInfty(std::array<value_type,3> inftys) override;
+    void SetDelta(std::array<value_type,3> deltas) override;
 
     void SetGridData(VelocityDistributionFunction distribution) override;
 

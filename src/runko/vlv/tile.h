@@ -12,18 +12,26 @@ class Tile : virtual public emf::Tile<D> {
 
   using value_type = VlasovGrid::value_type;
   using VDF = VlasovGrid::VelocityDistributionFunction;
+
+  using SpatialGrid = tyvi::mdgrid_buffer<
+    std::vector<DenseGrid>, 
+    std::extents<std::size_t>, 
+    std::layout_right, 
+    std::extents<std::size_t,std::dynamic_extent,std::dynamic_extent,std::dynamic_extent>, 
+    std::layout_right>;
+
 public:
   explicit Tile(
     std::array<std::size_t, 3> tile_grid_indices,
     const toolbox::ConfigParser& config);
 
 private:
-    DenseGrid vel_grid_; // TODO actually store a 3d grid of cells each of which having a velocity grid
+    SpatialGrid grid_;
 
 public:
-    auto& GetVelGrid() { return vel_grid_; }
-    void SetVelGrid(VDF distribution);
-    void DebugAccelerate(double ax, double ay, double az, double dt);
+    VlasovGrid& GetVelGrid(runko::index_t x, runko::index_t y, runko::index_t z);
+    void SetVelGrid(runko::index_t x, runko::index_t y, runko::index_t z, VDF distribution);
+    void DebugAccelerate(runko::index_t x, runko::index_t y, runko::index_t z, double ax, double ay, double az, double dt);
 
 };
 

@@ -48,8 +48,8 @@ void bind_vlv(  py::module& m_sub){
         return vlv::Tile<3>(tile_grid_indices, toolbox::ConfigParser(h));
       }))
     .def("SetVelDistribution", &vlv::Tile<3>::SetVelGrid)
-    .def("GetVelDistribution", [] (vlv::Tile<3>& tile) {
-        return to_ndarray(tile.GetVelGrid());
+    .def("GetVelDistribution", [] (vlv::Tile<3>& tile, runko::index_t x, runko::index_t y, runko::index_t z) {
+        return to_ndarray(dynamic_cast<vlv::DenseGrid&>(tile.GetVelGrid(x,y,z)));
     })
     .def("DebugAccelerate", &vlv::Tile<3>::DebugAccelerate);
 
