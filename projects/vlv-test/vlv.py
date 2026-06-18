@@ -38,7 +38,7 @@ def create_tile(x,y,z):
     return runko.vlv.threeD.Tile(tile_grid_idx, config)
 
 def maxwell_distr(vx, vy, vz):
-    v_0 = 0.01 # refrence velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
+    v_0 = 1.1 # refrence velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
     return (np.pi*v_0**2)**(-1.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
 
 def plot_distr():
@@ -109,8 +109,8 @@ if __name__ == "__main__":
     tile = create_tile(int(exs[0]),int(exs[1]),int(exs[2]))
 
     v_init = lambda x,y,z : maxwell_distr(x if dim == 3 else 0,y if dim >= 2 else 0,z)
-    tile.SetVelDistribution(v_init)
-    grid = tile.GetVelDistribution()
+    tile.SetVelDistribution(0,0,0,v_init)
+    grid = tile.GetVelDistribution(0,0,0)
     tot = sum(sum(sum(grid)))
     distributions = [center(grid)]
     itercounts = [0]
@@ -118,9 +118,10 @@ if __name__ == "__main__":
     print(f"Total fluid: {tot}")
     
     iters = 0
+    cbar = None
+    im = None
     
     if mode == "anim":
-        im = None
         if dim > 1:
             im = ax.imshow(grid[0], norm=LogNorm(vmin=1e-8, vmax=maxwell_distr(0,0,0))) 
             cbar = fig.colorbar(im, ax=ax)
@@ -132,30 +133,31 @@ if __name__ == "__main__":
         global grid, iters
         
         if frame == 0:
-            tile.SetVelDistribution(v_init)
-            tile.DebugAccelerate(0.0,0.0,0,1.0)
+            tile.SetVelDistribution(0,0,0,v_init)
+            tile.DebugAccelerate(0,0,0,0.0,0.0,0,1.0)
             iters += 1
         extra_iters = 5
         for i in range(extra_iters):
             x_acc = 0 if dim < 3 else -np.sin(-(frame*extra_iters+i)/1) * 0.5
             y_acc = 0 if dim < 2 else -np.cos(-(frame*extra_iters+i)/1) * 0.5
             z_acc =  np.sin(-(frame*extra_iters+i)/1) * 0.5 
-            tile.DebugAccelerate(x_acc, y_acc, z_acc, 1.0)
+            tile.DebugAccelerate(0,0,0,x_acc, y_acc, z_acc, 1.0)
             iters += 1
         
         if frame % 10 == 0:
-            grid = tile.GetVelDistribution()
+            grid = tile.GetVelDistribution(0,0,0)
             distributions.append(center(grid))
             itercounts.append(iters)
             print(f"Total fluid: {sum(sum(sum(grid)))}, difference {(1-sum(sum(sum(grid)))/tot)*100} % of original")
         
         # print(f"Total fluid: {sum(sum(grid[0]))}")
         if mode == "anim":
-            grid = tile.GetVelDistribution()
+            grid = tile.GetVelDistribution(0,0,0)
             
             if dim > 1:
                 im.set_array(grid[max_coords(grid)[0]])
                 cbar.update_normal(im)
+                im.set_clim(vmin=1e-8, vmax=maxwell_distr(0,0,0))
             else:
                 im.set_ydata(grid[0][0])    
             

@@ -70,4 +70,6 @@ projects/ffe/test-*
 unix-cpu/
 .vscode/
 
+CMakeCache.txt
+
 .cache/

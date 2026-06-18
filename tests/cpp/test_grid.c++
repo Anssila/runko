@@ -296,6 +296,117 @@ const suite<"dense grid testing"> s2 = [] {
     }
 
   };
+
+  "translate"_test = [] {
+    std::vector<vlv::DenseGrid> grids;
+    for (int i = 0; i < 3; i++){
+        grids.emplace_back(5,5,5);
+        grids[i].SetDelta({0.1f,0.1f,0.1f});
+        grids[i].InitDelta({0.2f,-0.1f,0.1f});
+        vlv::VlasovGrid::value_type tot = grids[i].DebugGetTotalFluid();
+        expect(tot == 1.0f) << "Expected 1.0, got " << tot;  
+    }
+    auto neighbors = std::vector<vlv::VlasovGrid*>{
+        static_cast<vlv::VlasovGrid*>(&grids[0]),
+        static_cast<vlv::VlasovGrid*>(&grids[1]),
+        static_cast<vlv::VlasovGrid*>(&grids[2])
+    };
+
+    // Test that fluid is moved from one grid to the other
+
+    grids[1].TranslateZ(neighbors, 1.0f);
+    grids[1].Clean();
+    grids[0].Clean();
+    grids[2].Clean();
+    auto tot1 = grids[0].DebugGetTotalFluid();
+    expect(tot1 == 0.0f) << "Expected 0.0, got " << tot1;
+    auto tot2 = grids[1].DebugGetTotalFluid();
+    expect(tot2 < 1.0f) << "Expected < 1.0, got " << tot2;
+    expect(tot2 > 0.0f) << "Expected > 0.0, got " << tot2;
+    auto tot3 = grids[2].DebugGetTotalFluid();
+    expect(tot3 < 1.0f) << "Expected < 1.0, got " << tot3;
+    expect(tot3 > 0.0f) << "Expected > 0.0, got " << tot3;
+
+    expect(tot1+tot2+tot3 == 1.0) << "Expected total to be 1.0, got " << tot1+tot2+tot3 << " from: " << tot1 << " + " << tot2 << " + " << tot3;  
+
+    // Test that fluid is conserved when moving around
+
+    grids[0].InitDelta({0.1f,0.1f,-0.1f});
+    grids[1].InitDelta({0.1f,0.1f,-0.1f});
+    grids[2].InitDelta({0.1f,0.1f,-0.1f});
+
+    tot1 = grids[0].DebugGetTotalFluid();
+    tot2 = grids[1].DebugGetTotalFluid();
+    tot3 = grids[2].DebugGetTotalFluid();
+
+    expect(tot1+tot2+tot3 == 3.0) << "Expected total to be 3.0, got " << tot1+tot2+tot3 << " from: " << tot1 << " + " << tot2 << " + " << tot3; 
+
+    
+
+    // Use periodic boundary conditions
+    grids[0].TranslateZ({neighbors[2],neighbors[0],neighbors[1]},1.0f);
+    grids[1].TranslateZ({neighbors[0],neighbors[1],neighbors[2]},1.0f);
+    grids[2].TranslateZ({neighbors[1],neighbors[2],neighbors[0]},1.0f);
+
+    grids[0].Clean();
+    grids[1].Clean();
+    grids[2].Clean();
+
+    tot1 = grids[0].DebugGetTotalFluid();
+    tot2 = grids[1].DebugGetTotalFluid();
+    tot3 = grids[2].DebugGetTotalFluid();
+    
+    expect(tot1+tot2+tot3 == 3.0) << "Expected total to be 3.0, got " << tot1+tot2+tot3 << " from: " << tot1 << " + " << tot2 << " + " << tot3; 
+
+    // Test that the fluid is in the correct configuration:
+    const vlv::VlasovGrid::value_type correct[5][5][5] = {
+        {
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f}
+        },
+        {
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f}
+        },
+        {
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f}
+        },
+        {
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,1.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f}
+        },
+        {
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f},
+            {0.0f,0.0f,0.0f,0.0f,0.0f}
+        }
+    };
+    for (uint i = 0; i < 5; i++)
+    for (uint j = 0; j < 5; j++)
+    for (uint k = 0; k < 5; k++){
+        auto val1 = grids[0].DebugGetFluid({i,j,k});
+        auto val2 = grids[1].DebugGetFluid({i,j,k});
+        auto val3 = grids[2].DebugGetFluid({i,j,k});
+        expect(val1 == correct[i][j][k]) << "Expected " << correct[i][j][k] << ", got " << val1 << " for grid 1 and indices {" << i << ", " << j << ", " << k << "}";
+        expect(val2 == correct[i][j][k]) << "Expected " << correct[i][j][k] << ", got " << val2 << " for grid 2 and indices {" << i << ", " << j << ", " << k << "}";
+        expect(val3 == correct[i][j][k]) << "Expected " << correct[i][j][k] << ", got " << val3 << " for grid 3 and indices {" << i << ", " << j << ", " << k << "}";
+    }
+  };
 };
 
 }  // namespace

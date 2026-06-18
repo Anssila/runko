@@ -8,9 +8,9 @@ def basic_config():
     config.Nx = 1
     config.Ny = 1
     config.Nz = 1
-    config.NxMesh = 5
-    config.NyMesh = 5
-    config.NzMesh = 5
+    config.NxMesh = 3
+    config.NyMesh = 3
+    config.NzMesh = 3
     config.Nvx = 10
     config.Nvy = 10
     config.Nvz = 10
@@ -178,7 +178,7 @@ class vlv_tile(unittest.TestCase):
         
         self.assertAlmostEqual(tot/tot3, 1)
         
-        # test that fluid accelerates at the corner for very large (negative) acceleration
+        # test that fluid accumulates at the corner for very large (negative) acceleration
         tile.DebugAccelerate(0,0,0,-1.0,-1.0,-1.0,10.0)
         grid = tile.GetVelDistribution(0,0,0)
         tot4 = sum(sum(sum(grid)))
@@ -190,6 +190,9 @@ class vlv_tile(unittest.TestCase):
         config.Nvx = 5
         config.Nvy = 5
         config.Nvz = 5
+        config.NxMesh = 5
+        config.NyMesh = 5
+        config.NzMesh = 5
         tile = create_tile(config)
         
         for x_,y_,z_ in itertools.product(range(config.NxMesh), range(config.NyMesh), range(config.NzMesh)):
@@ -217,7 +220,39 @@ class vlv_tile(unittest.TestCase):
                 for j in range(len(grid[0])):
                     self.assertEqual(grid[i][j][0],0)
         
-
+    def test_tile_translate(self):
+        config = basic_config()
+        config.Nvx = 5
+        config.Nvy = 5
+        config.Nvz = 5
+        config.NzMesh = 4
+        config.NxMesh = 3
+        config.NyMesh = 3
+        config.inftyx = 10
+        
+        tile = create_tile(config)
+        v_init = lambda x, y, z : 0 if x != 0 else 0 if y !=0 else 0 if z!= 5 else 1
+        
+        tile.SetVelDistribution(1,1,0, v_init)
+        tot = sum(sum(sum(tile.GetVelDistribution(1,1,0))))
+        self.assertAlmostEqual(tot, 1)
+        
+        for i in range(1,4):
+            v_init = lambda x, y, z : 0 
+            tile.SetVelDistribution(1,1,i, v_init)
+            tot = sum(sum(sum(tile.GetVelDistribution(1,1,i))))
+            self.assertAlmostEqual(tot, 0)
+        
+        tile.Translate()
+        
+        tot = sum(sum(sum(tile.GetVelDistribution(1,1,0))))
+        self.assertLess(tot, 1)
+        tot = sum(sum(sum(tile.GetVelDistribution(1,1,1))))
+        self.assertGreater(tot, 0)
+        tot = sum(sum(sum(tile.GetVelDistribution(1,1,2))))
+        self.assertAlmostEqual(tot, 0)
+        tot = sum(sum(sum(tile.GetVelDistribution(1,1,3))))
+        self.assertAlmostEqual(tot, 0)
 
 
 if __name__ == "__main__":

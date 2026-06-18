@@ -40,18 +40,19 @@ void bind_vlv(  py::module& m_sub){
 
   py::module m_3d = m_sub.def_submodule("threeD", "3D specializations");
 
-    py::class_<vlv::Tile<3>, emf::Tile<3>, corgi::Tile<3>, std::shared_ptr<vlv::Tile<3>>>(
+    py::class_<vlv::Tile<3, vlv::DenseGrid>, emf::Tile<3>, corgi::Tile<3>, std::shared_ptr<vlv::Tile<3,vlv::DenseGrid>>>(
     m_3d,
     "Tile")
     .def(
       py::init([](const std::array<std::size_t, 3> tile_grid_indices, const py::handle& h) {
-        return vlv::Tile<3>(tile_grid_indices, toolbox::ConfigParser(h));
+        return vlv::Tile<3, vlv::DenseGrid>(tile_grid_indices, toolbox::ConfigParser(h));
       }))
-    .def("SetVelDistribution", &vlv::Tile<3>::SetVelGrid)
-    .def("GetVelDistribution", [] (vlv::Tile<3>& tile, runko::index_t x, runko::index_t y, runko::index_t z) {
+    .def("SetVelDistribution", &vlv::Tile<3, vlv::DenseGrid>::SetVelGrid)
+    .def("GetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, runko::index_t x, runko::index_t y, runko::index_t z) {
         return to_ndarray(dynamic_cast<vlv::DenseGrid&>(tile.GetVelGrid(x,y,z)));
     })
-    .def("DebugAccelerate", &vlv::Tile<3>::DebugAccelerate);
+    .def("DebugAccelerate", &vlv::Tile<3, vlv::DenseGrid>::DebugAccelerate)
+    .def("Translate", &vlv::Tile<3, vlv::DenseGrid>::Translate);
 
 
 //   m_3d.def("_write_average_kinetic_energy", &pic::write_average_kinetic_energy);
