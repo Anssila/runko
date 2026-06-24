@@ -15,14 +15,22 @@ protected:
     // Values (2*order + 1) must be centered around the point relative to which t is measured, returns interpolation result to given order
     static constexpr value_type Interpolator(std::vector<value_type> &values, value_type t, const runko::index_t order=0); 
 public: 
+
+
     // implement shift operator using strang-splitting
-    void Shift(value_type dx, value_type dy, value_type dz, value_type dt){
+    void Shift(const tyvi::mdgrid_work& w, value_type dx, value_type dy, value_type dz, value_type dt){
         // TODO do correct strang-splitting, for now just do full shift sequentially for every dir 
         // TODO or should shift be done fully 3d?
-        Shift_dir(dx*dt, 0);
-        Shift_dir(dy*dt, 1);
-        Shift_dir(dz*dt, 2);
-    } 
+        Shift_dir(w, dx*dt, 0);
+        Shift_dir(w, dy*dt, 1);
+        Shift_dir(w, dz*dt, 2);
+    }
+    // overload Shift for a non-async version 
+    void Shift(value_type dx, value_type dy, value_type dz, value_type dt){ 
+        const auto w = tyvi::mdgrid_work{};
+        Shift(w, dx, dy, dz, dt);
+        w.wait();
+    }
     virtual void InitZero() = 0; // Function to initialize the velocity distribution to zeros
     virtual void InitDelta(std::array<value_type,3> v) = 0;  // Function to initialize the velocity distribution to a delta function around the specified velocity v
     virtual value_type DebugGetTotalFluid() const = 0;
@@ -30,13 +38,16 @@ public:
     virtual void SetSize(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) = 0;
     virtual void SetInfty(std::array<value_type,3> inftys) = 0; // Set the max value in the dense grid (infty_), sets deltaU accordingly based on extents
     virtual void SetDelta(std::array<value_type,3> deltas) = 0; // Set the resolution of the dense grid (deltaU), sets infty accordingly based on extents
-    virtual void TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl) = 0; // Translate the fluid in the z-axis from this VlasovGrid to neighboring grids depending on the velocity space coordinates
-    virtual void Clean() = 0; // Clean the old buffer and swap
+    virtual void TranslateZ(const tyvi::mdgrid_work& w, std::vector<VlasovGrid*> neighbors, value_type cfl) = 0; // Translate the fluid in the z-axis from this VlasovGrid to neighboring grids depending on the velocity space coordinates
+    virtual void TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl) = 0; // A non-async overload of Translate
+    virtual void Clean(const tyvi::mdgrid_work& w) = 0; // Clean the old buffer and swap
+    virtual void Clean() = 0; // A non-async overload of Clean
+    virtual void SendData(const tyvi::mdgrid_work& w, VlasovGrid &dest) = 0; // Send the data of this (virtual) VlasovGrid to another VlasovGrid such that it is superimposed on the data of the destination grid (the values are summed into the new grid)
 private: 
     // Shifts in the coordinate axes are private and virtual because they are used by the strang splitting
     // main shift function that is public (these shouldn't be directly accessed) and they are implemented in the 
     // actual implementations of the vlasov grid (dense grid / sparse grid ...)
-    virtual void Shift_dir(value_type dv, runko::index_t ax, const runko::index_t order = 0) = 0; // Shift the velocity space values in the ax-direction by dv
+    virtual void Shift_dir(const tyvi::mdgrid_work& w, value_type dv, runko::index_t ax, const runko::index_t order = 0) = 0; // Shift the velocity space values in the ax-direction by dv
 };
 
 
@@ -65,8 +76,11 @@ public:
 
     void SetGridData(VelocityDistributionFunction distribution) override;
 
+    void TranslateZ(const tyvi::mdgrid_work& w, std::vector<VlasovGrid*> neighbors, value_type cfl) override;
     void TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl) override;
+    void Clean(const tyvi::mdgrid_work& w) override;
     void Clean() override;
+    void SendData(const tyvi::mdgrid_work& w, VlasovGrid &test) override;
 
     std::array<runko::index_t,3> GetIndFromVel(std::array<value_type,3> u) const; // Helper function to get the indicies corresponding to a velocity in the sparse grid
     std::array<value_type,3> GetVelFromInd(std::array<runko::index_t,3> inds) const; // Helper function to get the velocity corresponding to a set of indicies in the dense grid
@@ -76,11 +90,9 @@ public:
     auto GetStagingMDS() const { return grid_->staging_mds(); }
     auto GetMDS() const { return grid_->mds(); }
     auto GetExtents() const { return extents_; }
-    // auto GetUnderlyingBuffer const { return grid_->span(); }
 
 private:
-    void Shift_dir(value_type dv, runko::index_t ax, const runko::index_t order=0) override; // Function for shifting in 1D along ax, interpolated to order "order"
-    
+    void Shift_dir(const tyvi::mdgrid_work& w, value_type dv, runko::index_t ax, const runko::index_t order=0) override; // Function for shifting in 1D along ax, interpolated to order "order"
     inline static void ClampInds(std::array<int32_t,3> &inds, std::array<runko::index_t,3> ex);
     static constexpr runko::index_t GetIndFromVel(value_type u, runko::index_t ex, value_type deltaU); // Helper function to get the index in the dense grid corresponding to a velocity in the ax-direction
     static constexpr value_type GetVelFromInd(runko::index_t ind, runko::index_t ex, value_type deltaU); // Helper function to get the velocity (beta in the ax-direction) corresponding to an index in the dense grid

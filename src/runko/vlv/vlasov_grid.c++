@@ -55,7 +55,7 @@ inline void DenseGrid::ClampInds(std::array<int32_t,3> &inds, std::array<runko::
     }
 }
 
-void DenseGrid::Shift_dir(value_type dv, runko::index_t ax, const runko::index_t order){
+void DenseGrid::Shift_dir(const tyvi::mdgrid_work& w, value_type dv, runko::index_t ax, const runko::index_t order){
     value_type shift_ind = dv / deltaU_[ax]; // how many indicies we shift by
     value_type min = sstd::floor(shift_ind); // the relative index of the cell with lower index we need to update
     value_type max = sstd::ceil(shift_ind); // the other relative index we need to update for every cell 
@@ -72,7 +72,7 @@ void DenseGrid::Shift_dir(value_type dv, runko::index_t ax, const runko::index_t
     auto min_rel = dir * min_ind; // relative position of min
     auto max_rel = dir * max_ind; // relative position of max
 
-    const auto w = tyvi::mdgrid_work{};
+    // const auto w = tyvi::mdgrid_work{};
 
     std::array<runko::index_t,3> extents = extents_;
 
@@ -100,20 +100,18 @@ void DenseGrid::Shift_dir(value_type dv, runko::index_t ax, const runko::index_t
             new_grid_mds[max_inds][] += Interpolator(interpolation_values, t_max, order);
     };
 
-    w.for_each_index(*new_grid_, std::move(kernel)).wait();
+    w.for_each_index(*new_grid_, std::move(kernel)); // .wait()
 
-    Clean(); // Clean the old buffer and swap
+    Clean(w); // Clean the old buffer and swap
 }
 
-void DenseGrid::TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl){
+void DenseGrid::TranslateZ(const tyvi::mdgrid_work& w, std::vector<VlasovGrid*> neighbors, value_type cfl){
     auto mds_grids = std::vector<decltype(grid_->mds())>();
     auto mds_new_grids = std::vector<decltype(new_grid_->mds())>();
     for (auto neighbor : neighbors){
         mds_new_grids.push_back(static_cast<DenseGrid*>(neighbor)->new_grid_->mds());
         mds_grids.push_back(static_cast<DenseGrid*>(neighbor)->grid_->mds());
     }
-
-    const auto w = tyvi::mdgrid_work{};
 
     const auto exs = extents_;
     const auto deltas = deltaU_;
@@ -125,18 +123,18 @@ void DenseGrid::TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl){
             GetVelFromInd(idx[2], exs[2], deltas[2])
         );
         const value_type invGamma = value_type{1} / sstd::sqrt(value_type{1} + toolbox::dot(u,u));
-        const value_type deltaZ = u[2] * invGamma * cfl;
+        const value_type deltaZ = u[2]* invGamma * cfl;
 
         value_type min = sstd::floor(deltaZ); // the relative index of the cell with lower index we need to update
         value_type max = sstd::ceil(deltaZ); // the other relative index we need to update
 
-        [[maybe_unused]] value_type t_min = min - deltaZ; 
-        [[maybe_unused]] value_type t_max = max - deltaZ; 
+        value_type t_min = min - deltaZ; 
+        value_type t_max = max - deltaZ; 
 
-        [[maybe_unused]] int32_t min_ind = static_cast<int32_t>(min) + static_cast<int32_t>((mds_grids.size()-1)/2);
-        [[maybe_unused]] int32_t max_ind = static_cast<int32_t>(max) + static_cast<int32_t>((mds_grids.size()-1)/2);
+        int32_t min_ind = static_cast<int32_t>(min) + static_cast<int32_t>((mds_grids.size()-1)/2);
+        int32_t max_ind = static_cast<int32_t>(max) + static_cast<int32_t>((mds_grids.size()-1)/2);
 
-        [[maybe_unused]] auto interpolation_values = std::vector<value_type>();
+        auto interpolation_values = std::vector<value_type>();
         interpolation_values.push_back(mds_grids[(mds_grids.size()-1)/2][idx][]); // TODO: add support for higher order interpolations, i.e. more values here
 
         mds_new_grids[min_ind][idx][] += Interpolator(interpolation_values, t_min, 0);
@@ -144,18 +142,44 @@ void DenseGrid::TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl){
             mds_new_grids[max_ind][idx][] += Interpolator(interpolation_values, t_max, 0);
     };
 
-    w.for_each_index(*grid_, std::move(kernel)).wait();
+    w.for_each_index(*grid_, std::move(kernel));
 }
 
-void DenseGrid::Clean(){
+void DenseGrid::TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl){
     const auto w = tyvi::mdgrid_work{};
+    TranslateZ(w, neighbors, cfl);
+    w.wait();
+}
 
+void DenseGrid::SendData(const tyvi::mdgrid_work& w, VlasovGrid &dest){
+    try {
+        DenseGrid &destination = dynamic_cast<DenseGrid&>(dest);
+
+        // const auto w = tyvi::mdgrid_work{};
+
+        auto kernel = [source_mds = new_grid_->mds(), dest_mds = destination.new_grid_->mds()] (const auto &idx) {
+            dest_mds[idx][] += source_mds[idx][];
+        };
+
+        w.for_each_index(*new_grid_, std::move(kernel)); // .wait()
+
+    } catch (const std::bad_cast& e) {
+        throw std::runtime_error("Cannot send data to a VlasovGrid of a different type!\n");
+    }
+}
+
+void DenseGrid::Clean(const tyvi::mdgrid_work& w){
     w.for_each_index(*grid_, [grid_mds = grid_->mds()] (const auto& idx){ // Set grid to zeros in order to have a clean new_grid after the swap
         grid_mds[idx][] = static_cast<value_type>(0.0f);
     });
 
-    w.wait();
     std::swap(grid_, new_grid_);
+}
+
+void DenseGrid::Clean(){
+    const auto w = tyvi::mdgrid_work{};
+    Clean(w);
+    w.wait();
 }
 
 vlv::VlasovGrid::value_type DenseGrid::DebugGetFluid(std::array<runko::index_t,3> inds) const{ // This function is inefficient; don't use for anything important

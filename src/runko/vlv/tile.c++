@@ -12,7 +12,12 @@ Tile<D, VGrid>::Tile(
         static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NxMesh")) + 2 * halo_size,
         static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NyMesh")) + 2 * halo_size,
         static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NzMesh")) + 2 * halo_size
-    )
+    ),
+    extents_{
+        static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NxMesh")) + 2 * halo_size,
+        static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NyMesh")) + 2 * halo_size,
+        static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NzMesh")) + 2 * halo_size
+    }
     {
     auto deltaUx = conf.get<float>("deltaUx");
     auto deltaUy = conf.get<float>("deltaUy");
@@ -38,7 +43,7 @@ Tile<D, VGrid>::Tile(
     auto Nvx = static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("Nvx"));
     auto Nvy = static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("Nvy"));
     auto Nvz = static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("Nvz"));
-    
+
     const auto mds = grid_.mds();
 
     for (auto idx : tyvi::sstd::index_space(mds)){
@@ -49,6 +54,13 @@ Tile<D, VGrid>::Tile(
 }
 
 template<std::size_t D, VelGridType VGrid>
+bool Tile<D, VGrid>::IsInside(std::array<runko::index_t, 3> idx) const{
+    return idx[0] < extents_[0] &&
+           idx[1] < extents_[1] &&
+           idx[2] < extents_[2];
+}
+
+template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::DebugAccelerate(runko::index_t x, runko::index_t y, runko::index_t z, double ax, double ay, double az, double dt){
     auto ax_ = static_cast<value_type>(ax);
     auto ay_ = static_cast<value_type>(ay);
@@ -56,47 +68,96 @@ void Tile<D, VGrid>::DebugAccelerate(runko::index_t x, runko::index_t y, runko::
     auto dt_ = static_cast<value_type>(dt);
 
     const auto mds = grid_.mds();
-    auto idx = std::array<runko::index_t,3>{x + halo_size,y + halo_size,z + halo_size};
-    mds[idx][].Shift(ax_, ay_, az_, dt_);
-    
+    auto idx = std::array<runko::index_t,3>{x,y,z};
+    if (!IsInside(idx)) 
+        throw std::runtime_error{ std::format("Indicies out of range! Got {}, {}, {} while extents are {}, {}, {}\n", idx[0], idx[1], idx[2], extents_[0], extents_[1], extents_[2]) };
+
+    const auto w = tyvi::mdgrid_work{};
+    mds[idx][].Shift(w, ax_, ay_, az_, dt_);
+    w.wait();
 }
 
 template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::SetVelGrid(runko::index_t x, runko::index_t y, runko::index_t z, VDF distribution){
-    auto idx = std::array<runko::index_t,3>{x + halo_size,y + halo_size,z + halo_size};
+    auto idx = std::array<runko::index_t,3>{x,y,z};
+    if (!IsInside(idx)) 
+        throw std::runtime_error{ std::format("Indicies out of range! Got {}, {}, {} while extents are {}, {}, {}\n", idx[0], idx[1], idx[2], extents_[0], extents_[1], extents_[2]) };
     const auto mds = grid_.mds();
     mds[idx][].SetGridData(distribution);
 }
 
 template<std::size_t D, VelGridType VGrid>
 VlasovGrid& Tile<D, VGrid>::GetVelGrid(runko::index_t x, runko::index_t y, runko::index_t z){
-    auto idx = std::array<runko::index_t,3>{x + halo_size,y + halo_size,z + halo_size};
+    auto idx = std::array<runko::index_t,3>{x,y,z};
+    if (!IsInside(idx)) 
+        throw std::runtime_error{ std::format("Indicies out of range! Got {}, {}, {} while extents are {}, {}, {}\n", idx[0], idx[1], idx[2], extents_[0], extents_[1], extents_[2]) };
     const auto mds = grid_.mds();
     return mds[idx][];
 }
 
 template<std::size_t D, VelGridType VGrid>
-void Tile<D, VGrid>::Translate(){ // TODO: other axes and strang-splitting
+void Tile<D, VGrid>::Translate(){ 
+
+    // TODO: other axes and strang-splitting
+    // TODO: make sure iteration includes halo regions of the other axes while translating along some axis
+
     const auto nh_mds = nonhalo_submds(grid_.mds());
     const auto mds = grid_.mds();
     const auto getInds = [=](uint64_t x, uint64_t y, uint64_t z){ // shifting the indices from nh_mds to mds
         return std::array<uint64_t,3>{ x + halo_size, y + halo_size, z + halo_size };
     };
 
+    const auto w = tyvi::mdgrid_work{};
+
     for (auto idx : tyvi::sstd::index_space(nh_mds)){
         auto neighbors = std::vector<VlasovGrid*>();
         neighbors.push_back(&mds[getInds(idx[0],idx[1],idx[2]-1)][]); // TODO allow higher order reconstruction / interpolation by adding more neighbors
         neighbors.push_back(&mds[getInds(idx[0],idx[1],idx[2]+0)][]);
         neighbors.push_back(&mds[getInds(idx[0],idx[1],idx[2]+1)][]);
-        
-        mds[getInds(idx[0],idx[1],idx[2])][].TranslateZ(neighbors, static_cast<value_type>(this->cfl_));
+
+        mds[getInds(idx[0],idx[1],idx[2])][].TranslateZ(w, neighbors, static_cast<value_type>(this->cfl_));
+    }
+    w.wait();
+}
+
+template<std::size_t D, VelGridType VGrid>
+void Tile<D, VGrid>::CleanUp(){
+    const auto mds = grid_.mds();
+    const auto w = tyvi::mdgrid_work{};
+
+    for (auto idx : tyvi::sstd::index_space(mds)){
+        mds[idx][].Clean(w);
+    }
+    w.wait();
+}
+
+template<std::size_t D, VelGridType VGrid>
+void Tile<D, VGrid>::DebugBC(){
+    // TODO: add other axes
+    const auto extents = this->yee_lattice_.extents_wout_halo();
+    const auto x_full = std::tuple { 0, 2 * halo_size + extents[0] };
+    const auto y_full = std::tuple { 0, 2 * halo_size + extents[1] };
+    [[maybe_unused]] const auto z_full = std::tuple { 0, 2 * halo_size + extents[2] };
+
+    // Create submdspans for the different halo regions and their accompanying destination regions 
+    // the submdspans' indices align so that the index of the point in the halo region corresponds to
+    // the same index for the point in the destination region
+
+    const auto z_left_halo = std::submdspan( std::forward<decltype(grid_.mds())>(grid_.mds()), x_full, y_full, std::tuple { 0, halo_size } );
+    const auto z_left_dest = std::submdspan( std::forward<decltype(grid_.mds())>(grid_.mds()), x_full, y_full, std::tuple { extents[2], extents[2] + halo_size } );
+    const auto z_right_halo = std::submdspan( std::forward<decltype(grid_.mds())>(grid_.mds()), x_full, y_full, std::tuple { extents[2] + halo_size , extents[2] + 2 * halo_size } );
+    const auto z_right_dest = std::submdspan( std::forward<decltype(grid_.mds())>(grid_.mds()), x_full, y_full, std::tuple { halo_size , 2 * halo_size } );
+
+    const auto w = tyvi::mdgrid_work{};
+
+    for (auto idx : tyvi::sstd::index_space(z_left_halo)){
+        z_left_halo[idx][].SendData(w,z_left_dest[idx][]);
     }
 
-    // TODO do communication here!! Or maybe split cleaning into a separate function?
-
-    for (auto idx : tyvi::sstd::index_space(nh_mds)){
-        mds[getInds(idx[0],idx[1],idx[2])][].Clean();
+    for (auto idx : tyvi::sstd::index_space(z_right_halo)){
+        z_right_halo[idx][].SendData(w,z_right_dest[idx][]);
     }
+    w.wait();
 }
 
 } // namespace vlv

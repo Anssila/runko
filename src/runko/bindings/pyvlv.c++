@@ -47,12 +47,32 @@ void bind_vlv(  py::module& m_sub){
       py::init([](const std::array<std::size_t, 3> tile_grid_indices, const py::handle& h) {
         return vlv::Tile<3, vlv::DenseGrid>(tile_grid_indices, toolbox::ConfigParser(h));
       }))
-    .def("SetVelDistribution", &vlv::Tile<3, vlv::DenseGrid>::SetVelGrid)
-    .def("GetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, runko::index_t x, runko::index_t y, runko::index_t z) {
-        return to_ndarray(dynamic_cast<vlv::DenseGrid&>(tile.GetVelGrid(x,y,z)));
+    .def("SetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::VDF f) {
+      tile.SetVelGrid( 
+        static_cast<runko::index_t>(x + emf::halo_size), 
+        static_cast<runko::index_t>(y + emf::halo_size), 
+        static_cast<runko::index_t>(z + emf::halo_size), 
+        f 
+      );
     })
-    .def("DebugAccelerate", &vlv::Tile<3, vlv::DenseGrid>::DebugAccelerate)
-    .def("Translate", &vlv::Tile<3, vlv::DenseGrid>::Translate);
+    .def("GetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z) {
+        return to_ndarray(dynamic_cast<vlv::DenseGrid&>(tile.GetVelGrid(
+          static_cast<runko::index_t>(x + emf::halo_size),
+          static_cast<runko::index_t>(y + emf::halo_size),
+          static_cast<runko::index_t>(z + emf::halo_size)
+        )));
+    })
+    .def("DebugAccelerate", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, double ax, double ay, double az, double dt) {
+      tile.DebugAccelerate( 
+        static_cast<runko::index_t>(x + emf::halo_size),
+        static_cast<runko::index_t>(y + emf::halo_size),
+        static_cast<runko::index_t>(z + emf::halo_size),
+        ax, ay, az, dt
+      );
+    })
+    .def("Translate", &vlv::Tile<3, vlv::DenseGrid>::Translate)
+    .def("CleanUp", &vlv::Tile<3, vlv::DenseGrid>::CleanUp)
+    .def("DebugBC", &vlv::Tile<3, vlv::DenseGrid>::DebugBC);
 
 
 //   m_3d.def("_write_average_kinetic_energy", &pic::write_average_kinetic_energy);
