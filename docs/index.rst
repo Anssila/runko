@@ -54,6 +54,7 @@ Key contributors that provided additional features and/or improvements include
    :maxdepth: 2
 
    installation
+   configuration-parameters
 
 .. toctree::
    :caption: Tutorials:
@@ -76,7 +77,9 @@ Key contributors that provided additional features and/or improvements include
    :caption: Developer notes:
    :maxdepth: 2
 
+   contributing
    dev-workflow
+   debugging
    unittool
    versions
    documentation
