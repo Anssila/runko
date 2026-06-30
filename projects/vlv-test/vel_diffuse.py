@@ -4,6 +4,7 @@ import numpy as np
 
 import matplotlib.animation as animation
 from matplotlib.colors import LogNorm
+from scipy.special import kn
 
 def draw_slice(ax, slice : np.ndarray):
     ax.imshow(slice, cmap='viridis')
@@ -28,7 +29,7 @@ def create_tile(x,y,z):
     # config.deltaUx = 0.06666
     # config.deltaUy = 0.2
     # config.deltaUz = 0.4
-    config.inftyx = 5.0
+    config.inftyx = 10.0
     # config.inftyy = 2.0
     # config.inftyz = 3.0
 
@@ -37,9 +38,11 @@ def create_tile(x,y,z):
 
     return runko.vlv.threeD.Tile(tile_grid_idx, config)
 
-def maxwell_distr(vx, vy, vz):
-    v_0 = 1.1 # refrence velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
+def maxwell_distr(vx, vy, vz, v_0):# refrence velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
     return (np.pi*v_0**2)**(-1.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
+
+def maxwell_juttner(vx,vy,vz, theta, m):
+    return 1.0/(4.0*np.pi*theta*kn(2,1.0/theta))*np.exp(-np.sqrt(1.0+vx**2+vy**2+vz**2)/theta)/m**3
 
 def plot_distr():
     plt.close()
@@ -95,35 +98,53 @@ if __name__ == "__main__":
     elif dim == 2:
         exs = [1,exs[0],exs[1]]
 
-    mode = input("Mode (anim/distr/width/temp): ")
+    mode = input("Mode (anim/distr/width/temp/rel): ")
 
-    if mode != "anim" and mode != "distr" and mode != "width" and mode != "temp":
+    if mode != "anim" and mode != "distr" and mode != "width" and mode != "temp" and mode != "rel":
         raise RuntimeError("Invalid mode!")
 
-    tot_iters = 1000
+    tot_iters = 50
 
     np.set_printoptions(linewidth=200)
 
     fig, ax = plt.subplots()
 
     tile = create_tile(int(exs[0]),int(exs[1]),int(exs[2]))
-
-    v_init = lambda x,y,z : maxwell_distr(x if dim == 3 else 0,y if dim >= 2 else 0,z)
+    T = 1.0
+    m = 1.0
+    k_B = 0.1
+    v_0 = np.sqrt(2*T*k_B/m)
+    theta = T*k_B/m
+    v_init = lambda x,y,z : maxwell_distr(x if dim == 3 else 0,y if dim >= 2 else 0,z,v_0)
+    if mode == "rel":
+        v_init = lambda x,y,z : maxwell_juttner(x if dim == 3 else 0,y if dim >= 2 else 0,z,theta,m)
     tile.SetVelDistribution(0,0,0,v_init)
     grid = tile.GetVelDistribution(0,0,0)
     tot = sum(sum(sum(grid)))
     distributions = [center(grid)]
     itercounts = [0]
-
-    print(f"Total fluid: {tot}")
+    print(theta)
+    print(kn(2,1.0/theta))
+    n_lambda = lambda x, y, z, gamma : 1.0 if dim == 3 else 1.0 if x == 0 else 0.0 if dim == 2 else 1.0 if x == 0 and y == 0 else 0.0
+    moment0_0 = tile.CalculateMoment(0,0,0,n_lambda)
+    print(f"Total fluid: {moment0_0} / {tot}")
+    vx_lambda_0 = lambda x, y, z, gamma : x / gamma
+    vy_lambda_0 = lambda x, y, z, gamma : y / gamma
+    vz_lambda_0 = lambda x, y, z, gamma : z / gamma
+    moment1x_0 = tile.CalculateMoment(0,0,0,vx_lambda_0)
+    moment1y_0 = tile.CalculateMoment(0,0,0,vy_lambda_0)
+    moment1z_0 = tile.CalculateMoment(0,0,0,vz_lambda_0)
+    t_lambda_0 = lambda x, y, z, gamma : ((x-moment1x_0)**2 + (y-moment1y_0)**2 + (z-moment1z_0)**2)
+    temperature_0 = tile.CalculateMoment(0,0,0,t_lambda_0) * m / (3*moment0_0*k_B)
+    print(f"Temperature: {temperature_0}")
 
     iters = 0
     cbar = None
     im = None
 
-    if mode == "anim":
+    if mode == "anim" or mode == "rel":
         if dim > 1:
-            im = ax.imshow(grid[0], norm=LogNorm(vmin=1e-8, vmax=maxwell_distr(0,0,0))) 
+            im = ax.imshow(grid[0], norm=LogNorm(vmin=1e-8, vmax= maxwell_distr(0,0,0,v_0) if mode == "anim" else maxwell_juttner(0,0,0,theta,m)))
             cbar = fig.colorbar(im, ax=ax)
         else:
             im = ax.plot(list(range(len(grid[0][0]))),grid[0][0])[0]
@@ -136,28 +157,40 @@ if __name__ == "__main__":
             tile.SetVelDistribution(0,0,0,v_init)
             tile.DebugAccelerate(0,0,0,0.0,0.0,0,1.0)
             iters += 1
-        extra_iters = 5
+        extra_iters = 1
         for i in range(extra_iters):
-            x_acc = 0 if dim < 3 else -np.sin(-(frame*extra_iters+i)/1) * 0.5
-            y_acc = 0 if dim < 2 else -np.cos(-(frame*extra_iters+i)/1) * 0.5
-            z_acc =  np.sin(-(frame*extra_iters+i)/1) * 0.5 
+            x_acc = 0 if dim < 3 else -np.sin(-(frame*extra_iters+i)/5) * 0.5
+            y_acc = 0 if dim < 2 else -np.cos(-(frame*extra_iters+i)/5) * 0.5
+            z_acc = np.sin(-(frame*extra_iters+i)/5) * 0.5 
             tile.DebugAccelerate(0,0,0,x_acc, y_acc, z_acc, 1.0)
             iters += 1
 
-        if frame % 10 == 0:
+        if frame % 1 == 0:
             grid = tile.GetVelDistribution(0,0,0)
             distributions.append(center(grid))
             itercounts.append(iters)
-            print(f"Total fluid: {sum(sum(sum(grid)))}, difference {(sum(sum(sum(grid)))/tot-1)*100} % of original")
+            # print(f"Total fluid: {sum(sum(sum(grid)))}, difference {(sum(sum(sum(grid)))/tot-1)*100} % of original")
+            moment0 = tile.CalculateMoment(0,0,0,n_lambda)
+            # print(f"Total fluid: {moment0}, difference {(moment0/moment0_0-1)*100} % if original")
+            vx_lambda = lambda x, y, z, gamma : x
+            vy_lambda = lambda x, y, z, gamma : y
+            vz_lambda = lambda x, y, z, gamma : z
+            moment1x = tile.CalculateMoment(0,0,0,vx_lambda)
+            moment1y = tile.CalculateMoment(0,0,0,vy_lambda)
+            moment1z = tile.CalculateMoment(0,0,0,vz_lambda)
+            t_lambda = lambda x, y, z, gamma : ((x-moment1x)**2 + (y-moment1y)**2 + (z-moment1z)**2)
+            temperature = tile.CalculateMoment(0,0,0,t_lambda) * m / (3*moment0*k_B)
+            # print(f"Velocity: {moment1x}, {moment1y}, {moment1z}")
+            print(f"Temperature: {temperature}, difference {(temperature/temperature_0-1)*100} % if original")
 
         # print(f"Total fluid: {sum(sum(grid[0]))}")
-        if mode == "anim":
+        if mode == "anim" or mode == "rel":
             grid = tile.GetVelDistribution(0,0,0)
 
             if dim > 1:
                 im.set_array(grid[max_coords(grid)[0]])
                 cbar.update_normal(im)
-                im.set_clim(vmin=1e-8, vmax=maxwell_distr(0,0,0))
+                im.set_clim(vmin=1e-8, vmax=maxwell_distr(0,0,0,v_0) if mode == "anim" else maxwell_juttner(0,0,0,theta,m))
             else:
                 im.set_ydata(grid[0][0])    
 
@@ -166,7 +199,7 @@ if __name__ == "__main__":
 
             return [im]
 
-    if mode == "anim":
+    if mode == "anim" or mode == "rel":
         ani = animation.FuncAnimation(fig, update, frames=tot_iters, interval=50, blit=True, repeat_delay=1000)
         plt.show()
     elif mode == "distr":

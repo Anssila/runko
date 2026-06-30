@@ -54,10 +54,9 @@ Tile<D, VGrid>::Tile(
 }
 
 template<std::size_t D, VelGridType VGrid>
-bool Tile<D, VGrid>::IsInside(std::array<runko::index_t, 3> idx) const{
-    return idx[0] < extents_[0] &&
-           idx[1] < extents_[1] &&
-           idx[2] < extents_[2];
+void Tile<D, VGrid>::AssertInside(std::array<runko::index_t, 3> idx) const{
+    if (idx[0] >= extents_[0] || idx[1] >= extents_[1] || idx[2] >= extents_[2])
+        throw std::runtime_error{ std::format("Indicies out of range! Got {}, {}, {} while extents are {}, {}, {}\n", idx[0], idx[1], idx[2], extents_[0], extents_[1], extents_[2]) };
 }
 
 template<std::size_t D, VelGridType VGrid>
@@ -69,9 +68,7 @@ void Tile<D, VGrid>::DebugAccelerate(runko::index_t x, runko::index_t y, runko::
 
     const auto mds = grid_.mds();
     auto idx = std::array<runko::index_t,3>{x,y,z};
-    if (!IsInside(idx)) 
-        throw std::runtime_error{ std::format("Indicies out of range! Got {}, {}, {} while extents are {}, {}, {}\n", idx[0], idx[1], idx[2], extents_[0], extents_[1], extents_[2]) };
-
+    AssertInside(idx); 
     const auto w = tyvi::mdgrid_work{};
     mds[idx][].Shift(w, ax_, ay_, az_, dt_);
     w.wait();
@@ -80,8 +77,7 @@ void Tile<D, VGrid>::DebugAccelerate(runko::index_t x, runko::index_t y, runko::
 template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::SetVelGrid(runko::index_t x, runko::index_t y, runko::index_t z, VDF distribution){
     auto idx = std::array<runko::index_t,3>{x,y,z};
-    if (!IsInside(idx)) 
-        throw std::runtime_error{ std::format("Indicies out of range! Got {}, {}, {} while extents are {}, {}, {}\n", idx[0], idx[1], idx[2], extents_[0], extents_[1], extents_[2]) };
+    AssertInside(idx); 
     const auto mds = grid_.mds();
     mds[idx][].SetGridData(distribution);
 }
@@ -89,8 +85,7 @@ void Tile<D, VGrid>::SetVelGrid(runko::index_t x, runko::index_t y, runko::index
 template<std::size_t D, VelGridType VGrid>
 VlasovGrid& Tile<D, VGrid>::GetVelGrid(runko::index_t x, runko::index_t y, runko::index_t z){
     auto idx = std::array<runko::index_t,3>{x,y,z};
-    if (!IsInside(idx)) 
-        throw std::runtime_error{ std::format("Indicies out of range! Got {}, {}, {} while extents are {}, {}, {}\n", idx[0], idx[1], idx[2], extents_[0], extents_[1], extents_[2]) };
+    AssertInside(idx); 
     const auto mds = grid_.mds();
     return mds[idx][];
 }
@@ -132,6 +127,15 @@ void Tile<D, VGrid>::CleanUp(){
 }
 
 template<std::size_t D, VelGridType VGrid>
+Tile<D, VGrid>::value_type Tile<D, VGrid>::CalculateMoment(runko::index_t x, runko::index_t y, runko::index_t z, MCF func){
+    auto idx = std::array<runko::index_t,3>{x,y,z};
+    AssertInside(idx); 
+    const auto mds = grid_.mds();
+    const auto w = tyvi::mdgrid_work{};
+    return mds[idx][].CalculateMoment(w, func);
+}
+
+template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::DebugBC(){
     // TODO: add other axes
     const auto extents = this->yee_lattice_.extents_wout_halo();
@@ -158,6 +162,29 @@ void Tile<D, VGrid>::DebugBC(){
         z_right_halo[idx][].SendData(w,z_right_dest[idx][]);
     }
     w.wait();
+}
+
+template<std::size_t D, VelGridType VGrid>
+void Tile<D, VGrid>::deposit_current(){
+    const auto nh_mds = nonhalo_submds(grid_.mds());
+    this->yee_lattice_.clear_current();
+    auto J_grid = runko::VecGrid<value_type>(grid_.grid_extents());
+    const auto J_smds = J_grid.staging_mds();
+    const auto w = tyvi::mdgrid_work{};
+
+    const auto Jx_lambda = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, double gamma) { return x / gamma; };
+    const auto Jy_lambda = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, double gamma) { return y / gamma; };
+    const auto Jz_lambda = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, double gamma) { return z / gamma; };
+
+    for (auto idx : tyvi::sstd::index_space(nh_mds)){
+        J_smds[idx][0] = nh_mds[idx][].CalculateMoment(w, Jx_lambda);
+        J_smds[idx][1] = nh_mds[idx][].CalculateMoment(w, Jy_lambda);
+        J_smds[idx][2] = nh_mds[idx][].CalculateMoment(w, Jz_lambda);
+    }
+    w.wait();
+    w.sync_from_staging(J_grid).wait(); // TODO: when to wait??
+
+    this->yee_lattice_.deposit_current(J_grid);
 }
 
 } // namespace vlv

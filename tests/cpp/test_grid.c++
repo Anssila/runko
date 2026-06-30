@@ -6,6 +6,7 @@
 #include "runko/vlv/vlasov_grid.h"
 #include <sstream>
 #include <iostream>
+#include <iomanip>
 namespace {
 
 using namespace boost::ut;
@@ -166,7 +167,7 @@ const suite<"dense grid testing"> s2 = [] {
     g.Shift(-2.0f, -2.0f, -2.0f, 1.0f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
     expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({0,0,0}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({0,0,0});
-    
+
 
     g.InitDelta({0.0f,0.0f,0.0f});
     g.Shift(0.03f,-0.01f,0.18f,1.0f);
@@ -341,7 +342,7 @@ const suite<"dense grid testing"> s2 = [] {
 
     expect(tot1+tot2+tot3 == 3.0) << "Expected total to be 3.0, got " << tot1+tot2+tot3 << " from: " << tot1 << " + " << tot2 << " + " << tot3; 
 
-    
+
 
     // Use periodic boundary conditions
     grids[0].TranslateZ({neighbors[2],neighbors[0],neighbors[1]},1.0f);
@@ -355,7 +356,7 @@ const suite<"dense grid testing"> s2 = [] {
     tot1 = grids[0].DebugGetTotalFluid();
     tot2 = grids[1].DebugGetTotalFluid();
     tot3 = grids[2].DebugGetTotalFluid();
-    
+
     expect(tot1+tot2+tot3 == 3.0) << "Expected total to be 3.0, got " << tot1+tot2+tot3 << " from: " << tot1 << " + " << tot2 << " + " << tot3; 
 
     // Test that the fluid is in the correct configuration:
@@ -406,6 +407,35 @@ const suite<"dense grid testing"> s2 = [] {
         expect(val2 == correct[i][j][k]) << "Expected " << correct[i][j][k] << ", got " << val2 << " for grid 2 and indices {" << i << ", " << j << ", " << k << "}";
         expect(val3 == correct[i][j][k]) << "Expected " << correct[i][j][k] << ", got " << val3 << " for grid 3 and indices {" << i << ", " << j << ", " << k << "}";
     }
+  };
+
+  "moment"_test = [] {
+    auto g = vlv::DenseGrid(5,5,5);
+    g.SetDelta({0.1f,0.1f,0.1f});
+    g.InitDelta({0.0f,0.0f,0.1f});
+    expect(g.DebugGetTotalFluid() == 1.0f);
+    const auto w = tyvi::mdgrid_work{};
+    const auto n = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma){
+        return 1.0f;
+    };
+
+    auto approxEq = [] (vlv::VlasovGrid::value_type a, vlv::VlasovGrid::value_type b){
+        expect(std::abs(static_cast<float>(a-b)) < 1e-8) << "Expected " << std::setprecision(10) << b << ", got " << a;
+    };
+
+    approxEq(g.CalculateMoment(w, n), 0.001f);
+    const auto u = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma){
+        return std::sqrt(x*x+y*y+z*z);
+    };
+
+    approxEq(g.CalculateMoment(w, u), 0.0001f);
+
+    const auto v = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma){
+        return std::sqrt(x*x+y*y+z*z) / gamma;
+    };
+
+    expect(g.CalculateMoment(w,v) < 0.0001f) << "Expected < 0.0001, got " << g.CalculateMoment(w,v);
+    expect(g.CalculateMoment(w,v) >= 0.00005f) << "Expected > 0.00005, got " << g.CalculateMoment(w,v);
   };
 };
 

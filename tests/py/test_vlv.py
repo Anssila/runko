@@ -2,6 +2,7 @@ import unittest
 import runko
 import numpy as np
 import itertools
+from scipy.special import kn
 
 def basic_config():
     config = runko.Configuration(None)
@@ -286,6 +287,68 @@ class vlv_tile(unittest.TestCase):
             tot += sum(sum(sum(tile.GetVelDistribution(1,1,i))))
         self.assertAlmostEqual(tot, config.NzMesh*125*14)
 
+    def test_moment_calculation(self):
+        # Test that moments of the velocity distribution are calculated correctly
+        dU = 0.2
+        k_B = 0.1
+        T = 1.0
+        m = 1.0
+        theta = k_B*T/m
+        config = basic_config()
+        config.inftyx = None
+        config.deltaUx = dU
+        tile = create_tile(config)
+
+        def maxwell_juttner(vx,vy,vz, theta, m):
+            return 1.0/(4.0*np.pi*theta*kn(2,1.0/theta))*np.exp(-np.sqrt(1.0+vx**2+vy**2+vz**2)/theta)/m**3
+
+        v_init = lambda x, y, z : maxwell_juttner(x,y,z, theta, m)
+        tile.SetVelDistribution(1,1,1, v_init)
+        grid = tile.GetVelDistribution(1,1,1)
+        tot = sum(sum(sum(grid))) * dU**3
+
+        # Test that number density is calculated correctly
+        n_lambda = lambda x, y, z, gamma : 1.0
+        moment0 = tile.CalculateMoment(1,1,1,n_lambda)
+        self.assertAlmostEqual(tot/moment0, 1.0, 5)
+
+        # Create tile in a way to have a good distribution for temperature calculation
+        config.inftyx = 10.0
+        config.deltaUx = None
+        config.Nvx = 50
+        config.Nvy = 50
+        config.Nvz = 50
+        tile = create_tile(config)
+        tile.SetVelDistribution(1,1,1,v_init)
+        moment0_0 = tile.CalculateMoment(1,1,1,n_lambda)
+
+        # Test that the bulk velocity is zero in all directions
+        vx_lambda = lambda x, y, z, gamma : x
+        vy_lambda = lambda x, y, z, gamma : y
+        vz_lambda = lambda x, y, z, gamma : z
+        moment1x = tile.CalculateMoment(1,1,1,vx_lambda)
+        moment1y = tile.CalculateMoment(1,1,1,vy_lambda)
+        moment1z = tile.CalculateMoment(1,1,1,vz_lambda)
+        self.assertAlmostEqual(moment1x, 0.0, 1)
+        self.assertAlmostEqual(moment1y, 0.0, 1)
+        self.assertAlmostEqual(moment1z, 0.0, 1)
+
+        # Test (non-relativistic) temperature calculation using bulk velocity
+        t_lambda = lambda x, y, z, gamma : ((x-moment1x)**2 + (y-moment1y)**2 + (z-moment1z)**2)
+        temperature = tile.CalculateMoment(1,1,1,t_lambda) * m / (3*moment0_0*k_B)
+        self.assertAlmostEqual(temperature, T, 0)
+
+        # Test that bulk velocity is non-zero after acceleration
+        tile.DebugAccelerate(1,1,1, 5.0, -2.0, 7.0, 1.0)
+        moment0 = tile.CalculateMoment(1,1,1,n_lambda)
+        self.assertAlmostEqual(moment0_0/moment0, 1.0, 5)
+        moment1x = tile.CalculateMoment(1,1,1,vx_lambda)
+        moment1y = tile.CalculateMoment(1,1,1,vy_lambda)
+        moment1z = tile.CalculateMoment(1,1,1,vz_lambda)
+
+        self.assertAlmostEqual(moment1x, 5.0,2)
+        self.assertAlmostEqual(moment1y, -2.0,2)
+        self.assertAlmostEqual(moment1z, 7.0,2)
 
 if __name__ == "__main__":
     unittest.main()

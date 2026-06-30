@@ -17,6 +17,7 @@ class Tile : virtual public emf::Tile<D> {
 public:
   using value_type = VlasovGrid::value_type;
   using VDF = VlasovGrid::VelocityDistributionFunction; // Type for functions that define velocity space distributions for initialization
+  using MCF = VlasovGrid::MomentCalculationFunction; // Type for functions that calculate moments of the velocity space
 
   // Type for storing the velocity grids of each cell of the tile in an mdgrid_buffer
   using SpatialGrid = tyvi::mdgrid_buffer<
@@ -49,7 +50,7 @@ protected:
     return std::submdspan(std::forward<MDS>(mds), x, y, z);
   }
 
-  bool IsInside(std::array<runko::index_t,3> idx) const;
+  void AssertInside(std::array<runko::index_t,3> idx) const;
 
 public:
     VlasovGrid& GetVelGrid(runko::index_t x, runko::index_t y, runko::index_t z); // Get a reference to the velocity distribution (VlasovGrid) of a specific cell
@@ -58,6 +59,8 @@ public:
     void Translate(); // Apply translation in regular space to all the cell in the tile (Only in the z-direction for now!)
     void CleanUp(); // Clean and swap buffers to be ready for the next iteration
     void DebugBC(); // Apply periodic boundary conditions for this tile, emulates (local) communication between tiles
-};
+    value_type CalculateMoment(runko::index_t x, runko::index_t y, runko::index_t z, MCF func); // Calculate a moment (specified by func) of the velocity space of the cell at x,y,z
+    void deposit_current(); // Calculate and deposit the current into the yee lattice
+  };
 
 } // namespace vlv

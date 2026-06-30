@@ -19,7 +19,7 @@ def create_tile(x,y,z, spatial, v_max):
     config.xmin = 0
     config.ymin = 0
     config.zmin = 0
-    config.cfl = 0.5
+    config.cfl = 50.8
     config.field_propagator = "FDTD2"
     # config.deltaUx = 0.06666
     # config.deltaUy = 0.2
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     vel_ex = int(input("Set velocity space extent: "))
     spatial_ex = int(input("Set spatial extent: "))
 
-    v_max = 2.0
+    v_max = 0.01
 
     if spatial_ex < 3:
         spatial_ex = 3
@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
     masked_data = np.ma.masked_less(data, 1e-8)
 
-    im = ax.imshow(masked_data, norm=LogNorm(vmin=1e-8, vmax=0.1), cmap=cmap, interpolation='none', extent=[-middle,spatial_ex-middle,-v_max,v_max])
+    im = ax.imshow(masked_data, norm=LogNorm(vmin=1e-8, vmax=maxwell_distr(0,0,0)), cmap=cmap, interpolation='none', extent=[-middle,spatial_ex-middle,-v_max,v_max])
     ax.set_aspect(vel_ex/(2*v_max))
     ax.set_xlabel("Paikka")
     ax.set_ylabel("Itseisnopeus (c)")
@@ -132,5 +132,5 @@ if __name__ == "__main__":
         return [im]
 
     ani = animation.FuncAnimation(fig, update, frames=tot_iters, interval=100, blit=True, repeat_delay=1000)
-    plt.show()
-    # ani.save(filename="1D1V.gif", writer="pillow")
+    # plt.show()
+    ani.save(filename="1D1V_classical.gif", writer="pillow")

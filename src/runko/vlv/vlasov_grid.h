@@ -9,7 +9,8 @@ namespace vlv{
 class VlasovGrid{
 public:
     using value_type = float;
-    using VelocityDistributionFunction = std::function<double(double, double, double)>;
+    using VelocityDistributionFunction = std::function<double(double, double, double)>; // Function to set the VDF, inputs are velocity coordinates in x, y, and z directions and output is the amount of phase fluid
+    using MomentCalculationFunction = std::function<double(double, double, double, double)>; // Function to calculate a moment of the velocity space, inputs are velocity coordinates (x,y,z) as well as a pre-calculated gamma
 
 protected:    
     // Values (2*order + 1) must be centered around the point relative to which t is measured, returns interpolation result to given order
@@ -43,7 +44,10 @@ public:
     virtual void Clean(const tyvi::mdgrid_work& w) = 0; // Clean the old buffer and swap
     virtual void Clean() = 0; // A non-async overload of Clean
     virtual void SendData(const tyvi::mdgrid_work& w, VlasovGrid &dest) = 0; // Send the data of this (virtual) VlasovGrid to another VlasovGrid such that it is superimposed on the data of the destination grid (the values are summed into the new grid)
-private: 
+
+    virtual value_type CalculateMoment(const tyvi::mdgrid_work& w, MomentCalculationFunction func) = 0; // Generalized function for calculating moments of the distribution velocity distribution.
+
+    private: 
     // Shifts in the coordinate axes are private and virtual because they are used by the strang splitting
     // main shift function that is public (these shouldn't be directly accessed) and they are implemented in the 
     // actual implementations of the vlasov grid (dense grid / sparse grid ...)
@@ -81,6 +85,8 @@ public:
     void Clean(const tyvi::mdgrid_work& w) override;
     void Clean() override;
     void SendData(const tyvi::mdgrid_work& w, VlasovGrid &test) override;
+
+    value_type CalculateMoment(const tyvi::mdgrid_work& w, MomentCalculationFunction func) override;
 
     std::array<runko::index_t,3> GetIndFromVel(std::array<value_type,3> u) const; // Helper function to get the indicies corresponding to a velocity in the sparse grid
     std::array<value_type,3> GetVelFromInd(std::array<runko::index_t,3> inds) const; // Helper function to get the velocity corresponding to a set of indicies in the dense grid

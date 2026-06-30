@@ -19,7 +19,7 @@ def create_tile(x,y,z, spatial, v_max):
     config.xmin = 0
     config.ymin = 0
     config.zmin = 0
-    config.cfl = 0.8
+    config.cfl = 1.0
     config.field_propagator = "FDTD2"
     # config.deltaUx = 0.06666
     # config.deltaUy = 0.2
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     if spatial_ex < 3:
         spatial_ex = 3
 
-    tot_iters = 200
+    tot_iters = 50
 
     np.set_printoptions(linewidth=200)
 
@@ -137,5 +137,5 @@ if __name__ == "__main__":
         return [im]
 
     ani = animation.FuncAnimation(fig, update, frames=tot_iters, interval=50, blit=True, repeat_delay=1000)
-    plt.show()
-    # ani.save(filename="1D1V.gif", writer="pillow")
+    # plt.show()
+    ani.save(filename="1D1V_accelerate2.gif", writer="pillow")

@@ -72,7 +72,16 @@ void bind_vlv(  py::module& m_sub){
     })
     .def("Translate", &vlv::Tile<3, vlv::DenseGrid>::Translate)
     .def("CleanUp", &vlv::Tile<3, vlv::DenseGrid>::CleanUp)
-    .def("DebugBC", &vlv::Tile<3, vlv::DenseGrid>::DebugBC);
+    .def("DebugBC", &vlv::Tile<3, vlv::DenseGrid>::DebugBC)
+    .def("deposit_current", &vlv::Tile<3, vlv::DenseGrid>::deposit_current)
+    .def("CalculateMoment", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::MCF f) {
+      return tile.CalculateMoment( 
+        static_cast<runko::index_t>(x + emf::halo_size), 
+        static_cast<runko::index_t>(y + emf::halo_size), 
+        static_cast<runko::index_t>(z + emf::halo_size), 
+        f 
+      );
+    });
 
 
 //   m_3d.def("_write_average_kinetic_energy", &pic::write_average_kinetic_energy);

@@ -1,5 +1,10 @@
 #include "vlasov_grid.h"
 #include "runko/tools/vector.h"
+#include "thrust/execution_policy.h"
+#include "thrust/host_vector.h"
+#include "thrust/iterator/counting_iterator.h"
+#include "thrust/iterator/transform_iterator.h"
+#include "thrust/reduce.h"
 namespace vlv{
 
 void DenseGrid::SetSize(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz){
@@ -189,6 +194,30 @@ vlv::VlasovGrid::value_type DenseGrid::DebugGetFluid(std::array<runko::index_t,3
 }
 
 
+vlv::VlasovGrid::value_type DenseGrid::CalculateMoment(const tyvi::mdgrid_work& w, MomentCalculationFunction func) {
+    namespace rn           = std::ranges;
+    const auto grid_mds = grid_->mds(); 
+    const auto index_space = tyvi::sstd::index_space(grid_mds);
+    const auto exs = extents_;
+    const auto deltas = deltaU_;
+
+    const auto calculate_integral = [grid_mds, exs, deltas, func](const auto idx) {
+        const auto f = grid_mds[idx][];
+        const auto u = toolbox::Vec3(
+            GetVelFromInd(idx[0], exs[0], deltas[0]),
+            GetVelFromInd(idx[1], exs[1], deltas[1]),
+            GetVelFromInd(idx[2], exs[2], deltas[2])
+        );
+        const value_type gamma = sstd::sqrt(value_type{1} + toolbox::dot(u,u)); // TODO is it necessary to calculate gamma here?
+        return f * static_cast<value_type>(func(u[0],u[1],u[2],gamma));
+    };
+    const auto v_iterator_begin =
+        thrust::make_transform_iterator(index_space.begin(), calculate_integral);
+    const auto v_iterator_end = rn::next(v_iterator_begin, rn::size(index_space));
+    const auto du3 = deltas[0] * deltas[1] * deltas[2];
+    return thrust::reduce(w.on_this(), v_iterator_begin, v_iterator_end) * du3;
+}
+
 constexpr vlv::VlasovGrid::value_type VlasovGrid::Interpolator(std::vector<value_type> &values, value_type t, runko::index_t order){
 
     // The interpolator takes in values describing the distribution around a center point (the middle value of "values" that
@@ -226,7 +255,7 @@ void DenseGrid::InitDelta(std::array<value_type,3> v){
     const auto staging_mds = grid_->staging_mds();
 
     std::array<runko::index_t,3> v_inds = GetIndFromVel(v);
-    
+
     for (const auto idx : tyvi::sstd::index_space(staging_mds)) {
         // If the index is the one corresponding to the given velocity, we set density to one, otherwise to zero
         staging_mds[idx][] = static_cast<value_type>(idx == v_inds ? 1.0f : 0.0f); 
@@ -244,7 +273,7 @@ void DenseGrid::InitDelta(std::array<value_type,3> v){
 
 void DenseGrid::SetGridData(VlasovGrid::VelocityDistributionFunction distribution) {
     const auto staging_mds = grid_->staging_mds();
-    
+
     for (const auto idx : tyvi::sstd::index_space(staging_mds)) {
         auto v = GetVelFromInd(idx);
         double x = static_cast<double>(v[0]);
