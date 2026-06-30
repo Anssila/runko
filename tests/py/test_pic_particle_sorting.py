@@ -6,17 +6,10 @@ import runko
 
 def make_test_tile():
     config = runko.Configuration(None)
-    config.Nx = 4
-    config.Ny = 4
-    config.Nz = 4
-    config.NxMesh = 6
-    config.NyMesh = 7
-    config.NzMesh = 6
-    config.xmin = 0
-    config.ymin = 0
-    config.zmin = 0
+    config.n_tiles = [4, 4, 4]
+    config.n_cells_per_tile = [6, 7, 6]
     config.cfl = 1
-    config.field_propagator = "FDTD2"
+    config.field_propagator = "fdtd2"
     config.q0 = -1
     config.m0 = 1
     config.q1 = 1
@@ -55,39 +48,41 @@ class pic_particle_sorting(unittest.TestCase):
         conf, tile = make_test_tile()
 
         def pgen(x, y, z):
-            return runko.pic.threeD.ParticleStateBatch(pos=(x, y, z), vel=(x, y, z))
+            return runko.pic.threeD.ParticleStateBatch(pos=(x, y, z), vel=(x/2, y/2, z/2))
+
+        def pgen1(x, y, z):
+            return runko.pic.threeD.ParticleStateBatch(pos=(x+0.1, y+0.1, z+0.1), vel=(x+0.2, y+0.2, z+0.2))
 
         tile.batch_inject_to_cells(0, pgen)
-        tile.batch_inject_to_cells(1, pgen)
+        tile.batch_inject_to_cells(0, pgen)
+        tile.batch_inject_to_cells(0, pgen)
+        tile.batch_inject_to_cells(1, pgen1)
+        tile.batch_inject_to_cells(1, pgen1)
 
-        pos0set0 = set((x, y, z) for x, y, z in zip(*tile.get_positions(0)))
-        vel0set0 = set((x, y, z) for x, y, z in zip(*tile.get_velocities(0)))
-        ids0set0 = set(tile.get_ids(0))
-        pos0set1 = set((x, y, z) for x, y, z in zip(*tile.get_positions(1)))
-        vel0set1 = set((x, y, z) for x, y, z in zip(*tile.get_velocities(1)))
-        ids0set1 = set(tile.get_ids(1))
+        def get_hashes():
+            pos0 = tile.get_positions(0)
+            vel0 = tile.get_velocities(0)
+            ids0 = tile.get_ids(0)
+            pos1 = tile.get_positions(1)
+            vel1 = tile.get_velocities(1)
+            ids1 = tile.get_ids(1)
 
-        def assertNoChange():
-            posset0 = set((x, y, z) for x, y, z in zip(*tile.get_positions(0)))
-            velset0 = set((x, y, z) for x, y, z in zip(*tile.get_velocities(0)))
-            idsset0 = set(tile.get_ids(0))
-            posset1 = set((x, y, z) for x, y, z in zip(*tile.get_positions(1)))
-            velset1 = set((x, y, z) for x, y, z in zip(*tile.get_velocities(1)))
-            idsset1 = set(tile.get_ids(1))
+            hashes = []
+            for x in [*pos0, *vel0, ids0, *pos1, *vel1, ids1]:
+                x.sort()
+                hashes.append(hash(tuple(x)))
 
-            self.assertEqual(posset0, pos0set0)
-            self.assertEqual(velset0, vel0set0)
-            self.assertEqual(idsset0, ids0set0)
-            self.assertEqual(posset1, pos0set1)
-            self.assertEqual(velset1, vel0set1)
-            self.assertEqual(idsset1, ids0set1)
+            return hashes
 
-        assertNoChange()
+        hashes0 = get_hashes();
+
+
+        self.assertEqual(hashes0, get_hashes())
         tile.sort_particles()
-        assertNoChange()
+        self.assertEqual(hashes0, get_hashes())
         tile.sort_particles()
         tile.sort_particles()
-        assertNoChange()
+        self.assertEqual(hashes0, get_hashes())
 
 
 if __name__ == "__main__":
