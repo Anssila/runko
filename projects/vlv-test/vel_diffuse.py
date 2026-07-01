@@ -12,24 +12,18 @@ def draw_slice(ax, slice : np.ndarray):
 
 def create_tile(x,y,z):
     config = runko.Configuration(None)
-    config.Nx = 1
-    config.Ny = 1
-    config.Nz = 1
-    config.NxMesh = 5
-    config.NyMesh = 5
-    config.NzMesh = 5
-    config.Nvx = x
-    config.Nvy = y
-    config.Nvz = z
+    config.n_tiles = [1,1,1]
+    config.n_cells_per_tile = [3,3,3]
+    config.v_grid_extents = [x,y,z]
     config.xmin = 0
     config.ymin = 0
     config.zmin = 0
     config.cfl = 1
-    config.field_propagator = "FDTD2"
+    config.field_propagator = "fdtd2"
     # config.deltaUx = 0.06666
     # config.deltaUy = 0.2
     # config.deltaUz = 0.4
-    config.inftyx = 10.0
+    config.u_max = [10.0,10.0,10.0]
     # config.inftyy = 2.0
     # config.inftyz = 3.0
 

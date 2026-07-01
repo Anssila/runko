@@ -9,45 +9,49 @@ Tile<D, VGrid>::Tile(
     corgi::Tile<D>(),
     emf::Tile<D>(tile_grid_indices, conf), 
     grid_(
-        static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NxMesh")) + 2 * halo_size,
-        static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NyMesh")) + 2 * halo_size,
-        static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NzMesh")) + 2 * halo_size
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[0]) + 2 * halo_size,
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[1]) + 2 * halo_size,
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[2]) + 2 * halo_size
     ),
     extents_{
-        static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NxMesh")) + 2 * halo_size,
-        static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NyMesh")) + 2 * halo_size,
-        static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("NzMesh")) + 2 * halo_size
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[0]) + 2 * halo_size,
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[1]) + 2 * halo_size,
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[2]) + 2 * halo_size
     }
     {
-    auto deltaUx = conf.get<float>("deltaUx");
-    auto deltaUy = conf.get<float>("deltaUy");
-    auto deltaUz = conf.get<float>("deltaUz");
-    auto x_infty = conf.get<float>("inftyx");
-    auto y_infty = conf.get<float>("inftyy");
-    auto z_infty = conf.get<float>("inftyz");
+
+    const auto converter = [] (std::vector<double> v) {
+        return std::array<vlv::VlasovGrid::value_type,3>{
+            static_cast<vlv::VlasovGrid::value_type>(v[0]),
+            static_cast<vlv::VlasovGrid::value_type>(v[1]),
+            static_cast<vlv::VlasovGrid::value_type>(v[2])
+        };
+    };
+    auto u_max = conf.get<std::vector<double>>("u_max");
+    auto u_res = conf.get<std::vector<double>>("u_res");
 
     auto initVelGrid = [=](VGrid &vel_grid){
-        if      (deltaUx.has_value() && !x_infty.has_value()) vel_grid.SetDelta({deltaUx.value(), deltaUy.value_or(deltaUx.value()), deltaUz.value_or(deltaUx.value())}); 
-        else if (!deltaUx.has_value() && x_infty.has_value()) vel_grid.SetInfty({x_infty.value(), y_infty.value_or(x_infty.value()), z_infty.value_or(x_infty.value())}); 
+        if      (u_res.has_value() && !u_max.has_value()) vel_grid.set_u_res(converter(u_res.value())); 
+        else if (!u_res.has_value() && u_max.has_value()) vel_grid.set_u_max(converter(u_max.value())); 
         else {
             std::stringstream msg;
-            if (!deltaUx.has_value() && !x_infty.has_value())
-                msg << "Cannot create tile without either deltaU or infty!\n";
+            if (!u_res.has_value() && !u_max.has_value())
+                msg << "Cannot create tile without either u_res or u_max!\n";
             else
-                msg << "Cannot create tile with both deltaU and infty!\n";
+                msg << "Cannot create tile with both u_res and u_max!\n";
             throw std::runtime_error(msg.str());
         }
     };
 
-
-    auto Nvx = static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("Nvx"));
-    auto Nvy = static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("Nvy"));
-    auto Nvz = static_cast<runko::index_t>(conf.get_or_throw<std::size_t>("Nvz"));
+    auto vel_exs = conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents");
+    auto Nvx = static_cast<runko::index_t>(vel_exs[0]);
+    auto Nvy = static_cast<runko::index_t>(vel_exs[1]);
+    auto Nvz = static_cast<runko::index_t>(vel_exs[2]);
 
     const auto mds = grid_.mds();
 
     for (auto idx : tyvi::sstd::index_space(mds)){
-        mds[idx][].SetSize(Nvx, Nvy, Nvz);
+        mds[idx][].set_size(Nvx, Nvy, Nvz);
         mds[idx][].InitZero();
         initVelGrid(mds[idx][]);
     }

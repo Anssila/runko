@@ -123,7 +123,7 @@ const suite<"dense grid testing"> s2 = [] {
 
   "initialize"_test = [] {
     auto g = vlv::DenseGrid(3,4,5);
-    g.SetDelta({0.1f,0.1f,0.1f});
+    g.set_u_res({0.1f,0.1f,0.1f});
     // Test zero initialization
 
     g.InitZero();
@@ -139,7 +139,7 @@ const suite<"dense grid testing"> s2 = [] {
 
   "shift"_test = [] {
     auto g = vlv::DenseGrid(5,5,5);
-    g.SetDelta({0.1f,0.1f,0.1f});
+    g.set_u_res({0.1f,0.1f,0.1f});
 
     // First test that zero fluid stays as zero
     g.InitZero(); 
@@ -183,7 +183,7 @@ const suite<"dense grid testing"> s2 = [] {
 
   "GetVelFromIndex"_test = [] {
     auto g = vlv::DenseGrid(5,6,7);
-    g.SetInfty({2.0f,2.0f,2.0f});
+    g.set_u_max({2.0f,2.0f,2.0f});
 
     auto approxEq = [] (std::array<vlv::VlasovGrid::value_type,3> a, std::array<vlv::VlasovGrid::value_type,3> b){
         expect(std::abs(static_cast<float>(a[0]-b[0])) < tolerance) << "Expected " << b[0] << ", got " << a[0];
@@ -200,7 +200,7 @@ const suite<"dense grid testing"> s2 = [] {
 
   "GetIndexFromVel"_test = [] {
     auto g = vlv::DenseGrid(5,6,7);
-    g.SetDelta({0.1f,0.1f,0.1f});
+    g.set_u_res({0.1f,0.1f,0.1f});
 
     expect(g.GetIndFromVel({-0.2f,-0.25f,-0.3f}) == std::array<runko::index_t,3>{0,0,0});
 
@@ -211,7 +211,7 @@ const suite<"dense grid testing"> s2 = [] {
 
   "odd_index"_test = [] {
     auto g = vlv::DenseGrid(7,7,7);
-    g.SetDelta({0.1f,0.1f,0.1f});
+    g.set_u_res({0.1f,0.1f,0.1f});
 
     auto test_inds = std::vector<std::array<runko::index_t,3>>{
         {0,0,0},
@@ -255,7 +255,7 @@ const suite<"dense grid testing"> s2 = [] {
 
   "even_index"_test = [] {
     auto g = vlv::DenseGrid(8,8,8);
-    g.SetDelta({0.1f,0.1f,0.1f});
+    g.set_u_res({0.1f,0.1f,0.1f});
 
     auto test_inds = std::vector<std::array<runko::index_t,3>>{
         {0,0,0},
@@ -302,7 +302,7 @@ const suite<"dense grid testing"> s2 = [] {
     std::vector<vlv::DenseGrid> grids;
     for (int i = 0; i < 3; i++){
         grids.emplace_back(5,5,5);
-        grids[i].SetDelta({0.1f,0.1f,0.1f});
+        grids[i].set_u_res({0.1f,0.1f,0.1f});
         grids[i].InitDelta({0.2f,-0.1f,0.1f});
         vlv::VlasovGrid::value_type tot = grids[i].DebugGetTotalFluid();
         expect(tot == 1.0f) << "Expected 1.0, got " << tot;  
@@ -411,7 +411,7 @@ const suite<"dense grid testing"> s2 = [] {
 
   "moment"_test = [] {
     auto g = vlv::DenseGrid(5,5,5);
-    g.SetDelta({0.1f,0.1f,0.1f});
+    g.set_u_res({0.1f,0.1f,0.1f});
     g.InitDelta({0.0f,0.0f,0.1f});
     expect(g.DebugGetTotalFluid() == 1.0f);
     const auto w = tyvi::mdgrid_work{};

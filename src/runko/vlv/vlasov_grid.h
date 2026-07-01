@@ -36,9 +36,9 @@ public:
     virtual void InitDelta(std::array<value_type,3> v) = 0;  // Function to initialize the velocity distribution to a delta function around the specified velocity v
     virtual value_type DebugGetTotalFluid() const = 0;
     virtual void SetGridData(VelocityDistributionFunction distribution) = 0;
-    virtual void SetSize(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) = 0;
-    virtual void SetInfty(std::array<value_type,3> inftys) = 0; // Set the max value in the dense grid (infty_), sets deltaU accordingly based on extents
-    virtual void SetDelta(std::array<value_type,3> deltas) = 0; // Set the resolution of the dense grid (deltaU), sets infty accordingly based on extents
+    virtual void set_size(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) = 0;
+    virtual void set_u_max(std::array<value_type,3> max) = 0; // Set the max value in the dense grid (u_max_), sets u_res_ accordingly based on extents
+    virtual void set_u_res(std::array<value_type,3> res) = 0; // Set the resolution of the dense grid (u_res_), sets u_max_ accordingly based on extents
     virtual void TranslateZ(const tyvi::mdgrid_work& w, std::vector<VlasovGrid*> neighbors, value_type cfl) = 0; // Translate the fluid in the z-axis from this VlasovGrid to neighboring grids depending on the velocity space coordinates
     virtual void TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl) = 0; // A non-async overload of Translate
     virtual void Clean(const tyvi::mdgrid_work& w) = 0; // Clean the old buffer and swap
@@ -62,21 +62,21 @@ public:
 
 private:
     std::array<runko::index_t, 3> extents_;
-    std::array<value_type, 3> infty_; // The max value for u that can be stored in the dense grid, for each axis
-    std::array<value_type, 3> deltaU_; // The resolution for u, i.e. what is the difference in u of neighboring cells of the dense grid, for each axis
+    std::array<value_type, 3> u_max_; // The max value for u that can be stored in the dense grid, for each axis
+    std::array<value_type, 3> u_res_; // The resolution for u, i.e. what is the difference in u of neighboring cells of the dense grid, for each axis
     std::shared_ptr<VelGrid> grid_, new_grid_; // the actual grids that store the velocity space phase fluid 
     // new_grid_ is used to update values and the pointers are swapped every time
 
 public:
     DenseGrid() = default;
-    DenseGrid(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) { SetSize(Nx,Ny,Nz); }
+    DenseGrid(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) { set_size(Nx,Ny,Nz); }
 
-    void SetSize(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) override;
+    void set_size(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz) override;
 
     void InitZero() override;
     void InitDelta(std::array<value_type,3>) override;
-    void SetInfty(std::array<value_type,3> inftys) override;
-    void SetDelta(std::array<value_type,3> deltas) override;
+    void set_u_max(std::array<value_type,3> max) override;
+    void set_u_res(std::array<value_type,3> res) override;
 
     void SetGridData(VelocityDistributionFunction distribution) override;
 

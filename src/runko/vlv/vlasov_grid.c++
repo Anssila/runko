@@ -7,7 +7,7 @@
 #include "thrust/reduce.h"
 namespace vlv{
 
-void DenseGrid::SetSize(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz){
+void DenseGrid::set_size(runko::index_t Nx, runko::index_t Ny, runko::index_t Nz){
     extents_ = {Nx, Ny, Nz};
     grid_ = std::make_unique<VelGrid>(Nx, Ny, Nz);
     new_grid_ = std::make_unique<VelGrid>(Nx, Ny, Nz);
@@ -24,31 +24,31 @@ constexpr vlv::VlasovGrid::value_type DenseGrid::GetVelFromInd(runko::index_t in
 
 std::array<runko::index_t,3> DenseGrid::GetIndFromVel(std::array<value_type,3> u) const{
     return std::array<runko::index_t,3>{
-        GetIndFromVel(u[0], extents_[0], deltaU_[0]), 
-        GetIndFromVel(u[1], extents_[1], deltaU_[1]), 
-        GetIndFromVel(u[2], extents_[2], deltaU_[2]) 
+        GetIndFromVel(u[0], extents_[0], u_res_[0]), 
+        GetIndFromVel(u[1], extents_[1], u_res_[1]), 
+        GetIndFromVel(u[2], extents_[2], u_res_[2]) 
     };
 }
 
 std::array<vlv::VlasovGrid::value_type,3> DenseGrid::GetVelFromInd(std::array<runko::index_t,3> inds) const{
     return std::array<value_type,3>{
-        GetVelFromInd(inds[0], extents_[0], deltaU_[0]),
-        GetVelFromInd(inds[1], extents_[1], deltaU_[1]),
-        GetVelFromInd(inds[2], extents_[2], deltaU_[2])
+        GetVelFromInd(inds[0], extents_[0], u_res_[0]),
+        GetVelFromInd(inds[1], extents_[1], u_res_[1]),
+        GetVelFromInd(inds[2], extents_[2], u_res_[2])
     };
 }
 
-void DenseGrid::SetDelta(std::array<value_type,3> deltas){
-    deltaU_ = deltas;
+void DenseGrid::set_u_res(std::array<value_type,3> res){
+    u_res_ = res;
     for (size_t i = 0; i < 3ul; i++){
-        infty_[i] = static_cast<value_type>(extents_[i]-1ul) * static_cast<value_type>(0.5f) * deltaU_[i];
+        u_max_[i] = static_cast<value_type>(extents_[i]-1ul) * static_cast<value_type>(0.5f) * u_res_[i];
     }
 }
 
-void DenseGrid::SetInfty(std::array<value_type,3> inftys){
-    infty_ = inftys;
+void DenseGrid::set_u_max(std::array<value_type,3> max){
+    u_max_ = max;
     for (size_t i = 0; i < 3ul; i++){
-        deltaU_[i] = infty_[i] / static_cast<value_type>(extents_[i]-1ul) * static_cast<value_type>(2.0f);
+        u_res_[i] = u_max_[i] / static_cast<value_type>(extents_[i]-1ul) * static_cast<value_type>(2.0f);
     }
 }
 
@@ -61,7 +61,7 @@ inline void DenseGrid::ClampInds(std::array<int32_t,3> &inds, std::array<runko::
 }
 
 void DenseGrid::Shift_dir(const tyvi::mdgrid_work& w, value_type dv, runko::index_t ax, const runko::index_t order){
-    value_type shift_ind = dv / deltaU_[ax]; // how many indicies we shift by
+    value_type shift_ind = dv / u_res_[ax]; // how many indicies we shift by
     value_type min = sstd::floor(shift_ind); // the relative index of the cell with lower index we need to update
     value_type max = sstd::ceil(shift_ind); // the other relative index we need to update for every cell 
 
@@ -119,7 +119,7 @@ void DenseGrid::TranslateZ(const tyvi::mdgrid_work& w, std::vector<VlasovGrid*> 
     }
 
     const auto exs = extents_;
-    const auto deltas = deltaU_;
+    const auto deltas = u_res_;
 
     auto kernel = [mds_grids, mds_new_grids, cfl, exs, deltas] (const auto& idx){
         const auto u = toolbox::Vec3(
@@ -199,7 +199,7 @@ vlv::VlasovGrid::value_type DenseGrid::CalculateMoment(const tyvi::mdgrid_work& 
     const auto grid_mds = grid_->mds(); 
     const auto index_space = tyvi::sstd::index_space(grid_mds);
     const auto exs = extents_;
-    const auto deltas = deltaU_;
+    const auto deltas = u_res_;
 
     const auto calculate_integral = [grid_mds, exs, deltas, func](const auto idx) {
         const auto f = grid_mds[idx][];

@@ -6,21 +6,15 @@ from scipy.special import kn
 
 def basic_config():
     config = runko.Configuration(None)
-    config.Nx = 1
-    config.Ny = 1
-    config.Nz = 1
-    config.NxMesh = 3
-    config.NyMesh = 3
-    config.NzMesh = 3
-    config.Nvx = 10
-    config.Nvy = 10
-    config.Nvz = 10
+    config.n_tiles = [1,1,1]
+    config.n_cells_per_tile = [3,3,3]
+    config.v_grid_extents = [10,10,10]
     config.xmin = 0
     config.ymin = 0
     config.zmin = 0
     config.cfl = 1
-    config.field_propagator = "FDTD2"
-    config.inftyx = 1
+    config.field_propagator = "fdtd2"
+    config.u_max = [1.0,1.0,1.0]
     return config
 
 
@@ -39,7 +33,7 @@ class vlv_tile(unittest.TestCase):
         config = basic_config()
         tile = create_tile(config)
 
-        for x,y,z in itertools.product(range(config.NxMesh), range(config.NyMesh), range(config.NzMesh)):
+        for x,y,z in itertools.product(range(config.n_cells_per_tile[0]), range(config.n_cells_per_tile[1]), range(config.n_cells_per_tile[2])):
 
             grid = tile.GetVelDistribution(x,y,z)
 
@@ -54,12 +48,8 @@ class vlv_tile(unittest.TestCase):
 
     def test_tile_set_data(self):
         config = basic_config()
-        config.Nvx = 3
-        config.Nvy = 3
-        config.Nvz = 3
-        config.inftyx = 1
-        config.inftyy = 2
-        config.inftyz = 3
+        config.v_grid_extents = [3,3,3]
+        config.u_max = [1.0,2.0,3.0]
         tile = create_tile(config)
 
         v_init = lambda x, y, z: x + y + z
@@ -85,9 +75,7 @@ class vlv_tile(unittest.TestCase):
 
     def test_tile_accelerate(self):
         config = basic_config()
-        config.Nvx = 5
-        config.Nvy = 5
-        config.Nvz = 5
+        config.v_grid_extents = [5,5,5]
         tile = create_tile(config)
 
         v_init = lambda x, y, z : 7 * x + 5 * y + 2 * z + 14
@@ -138,10 +126,8 @@ class vlv_tile(unittest.TestCase):
 
         # now test with a larger grid
         config = basic_config()
-        config.Nvx = 20
-        config.Nvy = 20
-        config.Nvz = 20
-        config.inftyx = 5
+        config.v_grid_extents = [20,20,20]
+        config.u_max = [5.0,5.0,5.0]
         tile = create_tile(config)
 
         v_init = lambda x, y, z : 7 * x + 5 * y + 2 * z + 70
@@ -188,15 +174,11 @@ class vlv_tile(unittest.TestCase):
 
     def test_tile_all_cells(self):
         config = basic_config()
-        config.Nvx = 5
-        config.Nvy = 5
-        config.Nvz = 5
-        config.NxMesh = 5
-        config.NyMesh = 5
-        config.NzMesh = 5
+        config.v_grid_extents = [5,5,5]
+        config.n_cells_per_tile = [5,5,5]
         tile = create_tile(config)
 
-        for x_,y_,z_ in itertools.product(range(config.NxMesh), range(config.NyMesh), range(config.NzMesh)):
+        for x_,y_,z_ in itertools.product(range(config.n_cells_per_tile[0]), range(config.n_cells_per_tile[1]), range(config.n_cells_per_tile[2])):
             v_init = lambda x, y, z : 7 * x + 5 * y + 2 * z + 14 + x_ + y_ + z_ 
 
             tile.SetVelDistribution(x_,y_,z_,v_init)
@@ -223,13 +205,9 @@ class vlv_tile(unittest.TestCase):
 
     def test_tile_translate(self):
         config = basic_config()
-        config.Nvx = 5
-        config.Nvy = 5
-        config.Nvz = 5
-        config.NzMesh = 4
-        config.NxMesh = 3
-        config.NyMesh = 3
-        config.inftyx = 10
+        config.v_grid_extents = [5,5,5]
+        config.n_cells_per_tile = [4,3,3]
+        config.u_max = [10.0,10.0,10.0]
 
         tile = create_tile(config)
         v_init = lambda x, y, z : 0 if x != 0 else 0 if y !=0 else 0 if z!= 5 else 1
@@ -259,33 +237,29 @@ class vlv_tile(unittest.TestCase):
     def test_tile_debug_bc(self):
         # Test that fluid is conserved while translating under periodic (debug) boundary conditions
         config = basic_config()
-        config.Nvx = 5
-        config.Nvy = 5
-        config.Nvz = 5
-        config.NzMesh = 4
-        config.NxMesh = 3
-        config.NyMesh = 3
+        config.v_grid_extents = [5,5,5]
+        config.n_cells_per_tile = [4,3,3]
 
         tile = create_tile(config)
         v_init = lambda x, y, z : 7 * x + 5 * y + 2 * z + 14 
 
-        for i in range(config.NzMesh):
+        for i in range(config.n_cells_per_tile[2]):
             tile.SetVelDistribution(1,1,i, v_init)
             tot = sum(sum(sum(tile.GetVelDistribution(1,1,i))))
             self.assertAlmostEqual(tot, 125*14)
         tot = 0
-        for i in range(config.NzMesh):
+        for i in range(config.n_cells_per_tile[2]):
             tot += sum(sum(sum(tile.GetVelDistribution(1,1,i))))
-        self.assertAlmostEqual(tot, config.NzMesh*125*14)
+        self.assertAlmostEqual(tot, config.n_cells_per_tile[2]*125*14)
 
         tile.Translate()
         tile.DebugBC()
         tile.CleanUp()
 
         tot = 0
-        for i in range(config.NzMesh):
+        for i in range(config.n_cells_per_tile[2]):
             tot += sum(sum(sum(tile.GetVelDistribution(1,1,i))))
-        self.assertAlmostEqual(tot, config.NzMesh*125*14)
+        self.assertAlmostEqual(tot, config.n_cells_per_tile[2]*125*14)
 
     def test_moment_calculation(self):
         # Test that moments of the velocity distribution are calculated correctly
@@ -295,8 +269,8 @@ class vlv_tile(unittest.TestCase):
         m = 1.0
         theta = k_B*T/m
         config = basic_config()
-        config.inftyx = None
-        config.deltaUx = dU
+        config.u_max = None
+        config.u_res = [dU,dU,dU]
         tile = create_tile(config)
 
         def maxwell_juttner(vx,vy,vz, theta, m):
@@ -313,11 +287,9 @@ class vlv_tile(unittest.TestCase):
         self.assertAlmostEqual(tot/moment0, 1.0, 5)
 
         # Create tile in a way to have a good distribution for temperature calculation
-        config.inftyx = 10.0
-        config.deltaUx = None
-        config.Nvx = 50
-        config.Nvy = 50
-        config.Nvz = 50
+        config.u_max = [10.0, 10.0, 10.0]
+        config.u_res = None
+        config.v_grid_extents = [50,50,50]
         tile = create_tile(config)
         tile.SetVelDistribution(1,1,1,v_init)
         moment0_0 = tile.CalculateMoment(1,1,1,n_lambda)

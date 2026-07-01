@@ -11,27 +11,15 @@ def draw_slice(ax, slice : np.ndarray):
 
 def create_tile(x,y,z, spatial):
     config = runko.Configuration(None)
-    config.Nx = 1
-    config.Ny = 1
-    config.Nz = 1
-    config.NxMesh = 3
-    config.NyMesh = 3
-    config.NzMesh = spatial
-    config.Nvx = x
-    config.Nvy = y
-    config.Nvz = z
+    config.n_tiles = [1,1,1]
+    config.n_cells_per_tile = [3,3,spatial]
+    config.v_grid_extents = [x,y,z]
     config.xmin = 0
     config.ymin = 0
     config.zmin = 0
     config.cfl = 0.5
-    config.field_propagator = "FDTD2"
-    # config.deltaUx = 0.06666
-    # config.deltaUy = 0.2
-    # config.deltaUz = 0.4
-    config.inftyx = 0.1
-    config.inftyy = 0.1
-    config.inftyz = 2.0
-
+    config.field_propagator = "fdtd2"
+    config.u_max = [0.1,0.1,2.0]
 
     tile_grid_idx = (0,0,0)
 
@@ -87,7 +75,7 @@ if __name__ == "__main__":
 
     exs = input("Set velocity space extents: ").split(" ")
     if len(exs) == 0 or exs[0] == "" or exs[0] == "0":
-        exs = [100, 100, 100]
+        exs = [20, 20, 20]
     dim = len(exs)
 
     if dim == 1:
