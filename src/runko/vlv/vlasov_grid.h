@@ -4,7 +4,6 @@
 
 namespace vlv{
 
-
 // Base class for different kinds of vlasov grid implementations
 class VlasovGrid{
 public:
@@ -19,17 +18,17 @@ public:
 
 
     // implement shift operator using strang-splitting
-    void Shift(const tyvi::mdgrid_work& w, value_type dx, value_type dy, value_type dz, value_type dt){
+    void Shift(const tyvi::mdgrid_work& w, value_type dx, value_type dy, value_type dz){
         // TODO do correct strang-splitting, for now just do full shift sequentially for every dir 
         // TODO or should shift be done fully 3d?
-        Shift_dir(w, dx*dt, 0);
-        Shift_dir(w, dy*dt, 1);
-        Shift_dir(w, dz*dt, 2);
+        Shift_dir(w, dx, 0);
+        Shift_dir(w, dy, 1);
+        Shift_dir(w, dz, 2);
     }
     // overload Shift for a non-async version 
-    void Shift(value_type dx, value_type dy, value_type dz, value_type dt){ 
+    void Shift(value_type dx, value_type dy, value_type dz){ 
         const auto w = tyvi::mdgrid_work{};
-        Shift(w, dx, dy, dz, dt);
+        Shift(w, dx, dy, dz);
         w.wait();
     }
     virtual void InitZero() = 0; // Function to initialize the velocity distribution to zeros
@@ -103,5 +102,9 @@ private:
     static constexpr runko::index_t GetIndFromVel(value_type u, runko::index_t ex, value_type deltaU); // Helper function to get the index in the dense grid corresponding to a velocity in the ax-direction
     static constexpr value_type GetVelFromInd(runko::index_t ind, runko::index_t ex, value_type deltaU); // Helper function to get the velocity (beta in the ax-direction) corresponding to an index in the dense grid
 };
+
+// Concept for templating Tiles (and VlasovContainers) based on the implementation of VlasovGrid that it uses
+template <typename VGrid>
+concept VelGridType = std::derived_from<VGrid, VlasovGrid>;
 
 } // namespace vlv

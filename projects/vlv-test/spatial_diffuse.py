@@ -19,8 +19,9 @@ def create_tile(x,y,z, spatial):
     config.zmin = 0
     config.cfl = 0.5
     config.field_propagator = "fdtd2"
-    config.u_max = [0.1,0.1,2.0]
-
+    config.u_max = [1.0,1.0,1.0]
+    config.q0 = 1.0
+    config.m0 = 1.0
     tile_grid_idx = (0,0,0)
 
     return runko.vlv.threeD.Tile(tile_grid_idx, config)
@@ -104,13 +105,13 @@ if __name__ == "__main__":
     v_init = lambda x,y,z : maxwell_distr(x if dim == 3 else 0,y if dim >= 2 else 0,z)
     v_0 = lambda x,y,z : 0
     middle = spatial_ex // 2
-    tile.SetVelDistribution(0,0,middle,v_init)
+    tile.SetVelDistribution(0,0,middle,v_init,0)
     for i in range(-3, spatial_ex +3):
         if i != middle:
-            tile.SetVelDistribution(0,0,i,v_0)
+            tile.SetVelDistribution(0,0,i,v_0,0)
     tot = 0
     for i in range(spatial_ex):
-        grid = tile.GetVelDistribution(0,0,i)
+        grid = tile.GetVelDistribution(0,0,i,0)
         tot += sum(sum(sum(grid)))
     # distributions = [center(grid)]
     itercounts = [0]
@@ -122,7 +123,7 @@ if __name__ == "__main__":
     im = []
 
     if mode == "anim":
-        grid = tile.GetVelDistribution(0,0,i)
+        grid = tile.GetVelDistribution(0,0,i,0)
 
         if dim == 3:
             for i in range(-3, spatial_ex +3):
@@ -139,10 +140,10 @@ if __name__ == "__main__":
         global grid, iters
 
         if frame == 0:
-            tile.SetVelDistribution(0,0,middle,v_init)
+            tile.SetVelDistribution(0,0,middle,v_init,0)
             for i in range(-3, spatial_ex +3):
                 if i != middle:
-                    tile.SetVelDistribution(0,0,i,v_0)
+                    tile.SetVelDistribution(0,0,i,v_0,0)
             iters += 1
         extra_iters = 1
         for i in range(extra_iters):
@@ -161,14 +162,14 @@ if __name__ == "__main__":
             # itercounts.append(iters)
             tot2 = 0
             for i in range(spatial_ex):
-                grid = tile.GetVelDistribution(0,0,i)
+                grid = tile.GetVelDistribution(0,0,i,0)
                 tot2 += sum(sum(sum(grid)))
             print(f"Total fluid: {tot2}, difference {(tot2/tot-1)*100} % of original")
 
         # print(f"Total fluid: {sum(sum(grid[0]))}")
         if mode == "anim":
             for i in range(-3, spatial_ex +3):
-                grid = tile.GetVelDistribution(0,0,i)
+                grid = tile.GetVelDistribution(0,0,i,0)
                 if dim == 3:
                     im[i+3].set_array(sum(grid))#[max_coords(grid)[0]]
                     # cbar[i+3].update_normal(im[i])
@@ -188,33 +189,5 @@ if __name__ == "__main__":
     if mode == "anim":
         ani = animation.FuncAnimation(fig, update, frames=tot_iters, interval=50, blit=True, repeat_delay=1000)
         plt.show()
-    # elif mode == "distr":
-    #     for i in range(tot_iters):
-    #         update(i)
 
-    #     plot_distr()
-    # elif mode == "width":
-    #     for i in range(tot_iters):
-    #         update(i)
-    #     widths = []
-    #     for d in distributions:
-    #         widths.append(get_width(d[1]))
-
-    #     k,b = np.polyfit(itercounts[5:],widths[5:], 1)
-
-    #     print(f"Slope: {k} cells / iteration")
-
-    #     plt.plot(itercounts,widths, "o")
-    #     plt.plot([0,itercounts[-1]], [b,k*itercounts[-1]+b], "-")
-    #     plt.show() 
-    # elif mode == "temp":
-    #     for i in range(tot_iters):
-    #         update(i)
-    #     widths = []
-    #     for d in distributions:
-    #         widths.append(get_width(d[1]))
-
-    #     temps = np.sqrt(widths)
-    #     plt.plot(itercounts, temps, "o")
-    #     plt.show()
 

@@ -143,40 +143,40 @@ const suite<"dense grid testing"> s2 = [] {
 
     // First test that zero fluid stays as zero
     g.InitZero(); 
-    g.Shift(0.1f,0.2f,0.3f, 1.0f);
+    g.Shift(0.1f,0.2f,0.3f);
     expect(std::abs(static_cast<float>(g.DebugGetTotalFluid())) < tolerance) << "Expected 0, got " << g.DebugGetTotalFluid();
 
     // Test that a delta distribution conserves fluid under shifting
     g.InitDelta({0.1f,-0.1f,0.2f});
     vlv::VlasovGrid::value_type tot = g.DebugGetTotalFluid();
     expect(tot == 1.0f);
-    g.Shift(0.0f, 0.0f, 0.0f, 1.0f);
+    g.Shift(0.0f, 0.0f, 0.0f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(0.05f, 0.0f, 0.0f, 1.0f);
+    g.Shift(0.05f, 0.0f, 0.0f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(-0.1f, 0.0f, 0.0f, 1.0f);
+    g.Shift(-0.1f, 0.0f, 0.0f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(0.05f, 0.05f, 0.05f, 1.0f);
+    g.Shift(0.05f, 0.05f, 0.05f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(1.05f, 1.05f, 1.05f, 1.0f);
+    g.Shift(1.05f, 1.05f, 1.05f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
     expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({4,4,4}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({4,4,4});
-    g.Shift(1.0f,1.0f,1.0f,-0.2f);
+    g.Shift(-0.2f,-0.2f,-0.2f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
     expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({2,2,2}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({2,2,2});
-    g.Shift(-2.0f, -2.0f, -2.0f, 1.0f);
+    g.Shift(-2.0f, -2.0f, -2.0f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
     expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({0,0,0}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({0,0,0});
 
 
     g.InitDelta({0.0f,0.0f,0.0f});
-    g.Shift(0.03f,-0.01f,0.18f,1.0f);
+    g.Shift(0.03f,-0.01f,0.18f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(-0.03f,0.01f,-0.18f,1.0f);
+    g.Shift(-0.03f,0.01f,-0.18f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(0.09f,-0.21f,3.1455f,1.0f);
+    g.Shift(0.09f,-0.21f,3.1455f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(0.03f,0.37f,0.0f,1.0f);
+    g.Shift(0.03f,0.37f,0.0f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
 
   };

@@ -18,14 +18,15 @@ def create_tile(x,y,z, spatial, v_max):
     config.u_max = [0.1,0.1,v_max]
 
     tile_grid_idx = (0,0,0)
-
+    config.q0 = 1.0
+    config.m0 = 1.0
 
     tile_grid_idx = (0,0,0)
 
     return runko.vlv.threeD.Tile(tile_grid_idx, config)
 
 def maxwell_distr(vx, vy, vz):
-    v_0 = 2.1 # refrence velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
+    v_0 = 2.1 # reference velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
     return (np.pi*v_0**2)**(-0.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
 
 if __name__ == "__main__":
@@ -50,13 +51,13 @@ if __name__ == "__main__":
     v_init = lambda x,y,z : 0.1 #maxwell_distr(0,0,z)
     v_0 = lambda x,y,z : 0
     middle = spatial_ex // 2
-    tile.SetVelDistribution(1,1,middle,v_init)
+    tile.SetVelDistribution(1,1,middle,v_init,0)
     for i in range(-3, spatial_ex +3):
         if i != middle:
-            tile.SetVelDistribution(1,1,i,v_0)
+            tile.SetVelDistribution(1,1,i,v_0,0)
     tot = 0
     for i in range(spatial_ex):
-        grid = tile.GetVelDistribution(1,1,i)
+        grid = tile.GetVelDistribution(1,1,i,0)
         tot += sum(sum(sum(grid)))
     # distributions = [center(grid)]
     itercounts = [0]
@@ -66,7 +67,7 @@ if __name__ == "__main__":
     iters = 0
     data = []
     for i in range(spatial_ex):
-        grid = tile.GetVelDistribution(1,1,i)
+        grid = tile.GetVelDistribution(1,1,i,0)
         data.append(grid[0][0])
     data = np.array(data)
     data = np.rot90(data)
@@ -88,10 +89,10 @@ if __name__ == "__main__":
         global grid, iters, data
 
         if frame == 0:
-            tile.SetVelDistribution(1,1,middle,v_init)
+            tile.SetVelDistribution(1,1,middle,v_init,0)
             for i in range(-3, spatial_ex +3):
                 if i != middle:
-                    tile.SetVelDistribution(1,1,i,v_0)
+                    tile.SetVelDistribution(1,1,i,v_0,0)
             iters += 1
         extra_iters = 10
         for i in range(extra_iters):
@@ -103,17 +104,17 @@ if __name__ == "__main__":
         if frame % 1 == 0:
             tot2 = 0
             for i in range(spatial_ex):
-                grid = tile.GetVelDistribution(1,1,i)
+                grid = tile.GetVelDistribution(1,1,i,0)
                 tot2 += sum(sum(sum(grid)))
             print(f"Total fluid: {tot2}, difference {(tot2/tot-1)*100} % of original")
 
         for i in range(spatial_ex):
-            grid = tile.GetVelDistribution(1,1,i)
+            grid = tile.GetVelDistribution(1,1,i,0)
             data = np.rot90(data, 3)
 
 
             for i in range(spatial_ex):
-                grid = tile.GetVelDistribution(1,1,i)
+                grid = tile.GetVelDistribution(1,1,i,0)
                 data[i] = grid[0][0]
             data = np.rot90(data)
             masked_data = np.ma.masked_less(data, 1e-8)

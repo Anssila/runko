@@ -18,7 +18,8 @@ def create_tile(x,y,z, spatial, v_max):
     config.u_max = [0.1,0.1,v_max]
 
     tile_grid_idx = (0,0,0)
-
+    config.q0 = 1.0
+    config.m0 = 1.0
 
     tile_grid_idx = (0,0,0)
 
@@ -32,13 +33,14 @@ if __name__ == "__main__":
 
     vel_ex = int(input("Set velocity space extent: "))
     spatial_ex = int(input("Set spatial extent: "))
+    filename = input("Save animation? Filename (leave blank to show and not save): ")
 
     v_max = 2.0
 
     if spatial_ex < 3:
         spatial_ex = 3
 
-    tot_iters = 50
+    tot_iters = 200
 
     np.set_printoptions(linewidth=200)
 
@@ -49,14 +51,14 @@ if __name__ == "__main__":
     v_init = lambda x,y,z : maxwell_distr(0,0,z)
     v_0 = lambda x,y,z : 0
     middle = spatial_ex // 2
-    tile.SetVelDistribution(1,1,middle,v_init)
-    tile.DebugAccelerate(1,1,middle,0,0,1.0,1.0)
+    tile.SetVelDistribution(1,1,middle,v_init,0)
+    tile.DebugAccelerate(1,1,middle,0,0,1.0)
     for i in range(-3, spatial_ex +3):
         if i != middle:
-            tile.SetVelDistribution(1,1,i,v_0)
+            tile.SetVelDistribution(1,1,i,v_0,0)
     tot = 0
     for i in range(spatial_ex):
-        grid = tile.GetVelDistribution(1,1,i)
+        grid = tile.GetVelDistribution(1,1,i,0)
         tot += sum(sum(sum(grid)))
     # distributions = [center(grid)]
     itercounts = [0]
@@ -66,7 +68,7 @@ if __name__ == "__main__":
     iters = 0
     data = []
     for i in range(spatial_ex):
-        grid = tile.GetVelDistribution(1,1,i)
+        grid = tile.GetVelDistribution(1,1,i,0)
         data.append(grid[0][0])
     data = np.array(data)
     data = np.rot90(data)
@@ -88,16 +90,16 @@ if __name__ == "__main__":
         global grid, iters, data
 
         if frame == 0:
-            tile.SetVelDistribution(1,1,middle,v_init)
-            tile.DebugAccelerate(1,1,middle,0,0,1.0,1.0)
+            tile.SetVelDistribution(1,1,middle,v_init,0)
+            tile.DebugAccelerate(1,1,middle,0,0,1.0)
             for i in range(-3, spatial_ex +3):
                 if i != middle:
-                    tile.SetVelDistribution(1,1,i,v_0)
+                    tile.SetVelDistribution(1,1,i,v_0,0)
             iters += 1
         extra_iters = 5
         for i in range(extra_iters):
             for j in range(spatial_ex):
-                tile.DebugAccelerate(1,1,j,0,0,-np.sin(frame/10),0.02)
+                tile.DebugAccelerate(1,1,j,0,0,-np.sin(frame/20)*0.01)
 
             tile.Translate()
             tile.DebugBC()
@@ -107,17 +109,17 @@ if __name__ == "__main__":
         if frame % 1 == 0:
             tot2 = 0
             for i in range(spatial_ex):
-                grid = tile.GetVelDistribution(1,1,i)
+                grid = tile.GetVelDistribution(1,1,i,0)
                 tot2 += sum(sum(sum(grid)))
             print(f"Total fluid: {tot2}, difference {(tot2/tot-1)*100} % of original")
 
         for i in range(spatial_ex):
-            grid = tile.GetVelDistribution(1,1,i)
+            grid = tile.GetVelDistribution(1,1,i,0)
             data = np.rot90(data, 3)
 
 
             for i in range(spatial_ex):
-                grid = tile.GetVelDistribution(1,1,i)
+                grid = tile.GetVelDistribution(1,1,i,0)
                 data[i] = grid[0][0]
             data = np.rot90(data)
             masked_data = np.ma.masked_less(data, 1e-8)
@@ -128,5 +130,7 @@ if __name__ == "__main__":
         return [im]
 
     ani = animation.FuncAnimation(fig, update, frames=tot_iters, interval=50, blit=True, repeat_delay=1000)
-    # plt.show()
-    ani.save(filename="1D1V_accelerate2.gif", writer="pillow")
+    if filename == "":
+        plt.show()
+    else:
+        ani.save(filename=filename, writer="pillow")

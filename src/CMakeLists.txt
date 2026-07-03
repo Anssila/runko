@@ -37,6 +37,7 @@ set (VLV_FILES
      ./runko/bindings/pyvlv.c++
      ./runko/vlv/vlasov_grid.c++
      ./runko/vlv/tile.c++
+     ./runko/vlv/vlasov_container.c++
      )
 
 add_library(runko_vlv

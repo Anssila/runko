@@ -47,39 +47,43 @@ void bind_vlv(  py::module& m_sub){
       py::init([](const std::array<std::size_t, 3> tile_grid_indices, const py::handle& h) {
         return vlv::Tile<3, vlv::DenseGrid>(tile_grid_indices, toolbox::ConfigParser(h));
       }))
-    .def("SetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::VDF f) {
+    .def("SetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::VDF f, int species) {
       tile.SetVelGrid( 
         static_cast<runko::index_t>(x + emf::halo_size), 
         static_cast<runko::index_t>(y + emf::halo_size), 
         static_cast<runko::index_t>(z + emf::halo_size), 
-        f 
+        f,
+        static_cast<runko::index_t>(species)
       );
     })
-    .def("GetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z) {
+    .def("GetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, int species) {
         return to_ndarray(dynamic_cast<vlv::DenseGrid&>(tile.GetVelGrid(
           static_cast<runko::index_t>(x + emf::halo_size),
           static_cast<runko::index_t>(y + emf::halo_size),
-          static_cast<runko::index_t>(z + emf::halo_size)
+          static_cast<runko::index_t>(z + emf::halo_size),
+          static_cast<runko::index_t>(species)
         )));
     })
-    .def("DebugAccelerate", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, double ax, double ay, double az, double dt) {
+    .def("DebugAccelerate", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, double ax, double ay, double az) {
       tile.DebugAccelerate( 
         static_cast<runko::index_t>(x + emf::halo_size),
         static_cast<runko::index_t>(y + emf::halo_size),
         static_cast<runko::index_t>(z + emf::halo_size),
-        ax, ay, az, dt
+        ax, ay, az
       );
     })
     .def("Translate", &vlv::Tile<3, vlv::DenseGrid>::Translate)
+    .def("accelerate", &vlv::Tile<3, vlv::DenseGrid>::accelerate)
     .def("CleanUp", &vlv::Tile<3, vlv::DenseGrid>::CleanUp)
     .def("DebugBC", &vlv::Tile<3, vlv::DenseGrid>::DebugBC)
     .def("deposit_current", &vlv::Tile<3, vlv::DenseGrid>::deposit_current)
-    .def("CalculateMoment", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::MCF f) {
+    .def("CalculateMoment", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::MCF f, int species) {
       return tile.CalculateMoment( 
         static_cast<runko::index_t>(x + emf::halo_size), 
         static_cast<runko::index_t>(y + emf::halo_size), 
         static_cast<runko::index_t>(z + emf::halo_size), 
-        f 
+        f,
+        static_cast<runko::index_t>(species)
       );
     });
 

@@ -20,13 +20,10 @@ def create_tile(x,y,z):
     config.zmin = 0
     config.cfl = 1
     config.field_propagator = "fdtd2"
-    # config.deltaUx = 0.06666
-    # config.deltaUy = 0.2
-    # config.deltaUz = 0.4
-    config.u_max = [10.0,10.0,10.0]
-    # config.inftyy = 2.0
-    # config.inftyz = 3.0
-
+    # config.u_max = [10.0,10.0,10.0]
+    config.u_res = [0.2,0.2,0.2]
+    config.q0 = 1.0
+    config.m0 = 1.0
 
     tile_grid_idx = (0,0,0)
 
@@ -112,24 +109,33 @@ if __name__ == "__main__":
     v_init = lambda x,y,z : maxwell_distr(x if dim == 3 else 0,y if dim >= 2 else 0,z,v_0)
     if mode == "rel":
         v_init = lambda x,y,z : maxwell_juttner(x if dim == 3 else 0,y if dim >= 2 else 0,z,theta,m)
-    tile.SetVelDistribution(0,0,0,v_init)
-    grid = tile.GetVelDistribution(0,0,0)
+    tile.SetVelDistribution(0,0,0,v_init,0)
+    grid = tile.GetVelDistribution(0,0,0,0)
     tot = sum(sum(sum(grid)))
     distributions = [center(grid)]
     itercounts = [0]
     print(theta)
     print(kn(2,1.0/theta))
-    n_lambda = lambda x, y, z, gamma : 1.0 if dim == 3 else 1.0 if x == 0 else 0.0 if dim == 2 else 1.0 if x == 0 and y == 0 else 0.0
-    moment0_0 = tile.CalculateMoment(0,0,0,n_lambda)
+    n_lambda = None
+    match dim:
+        case 3:
+            n_lambda = lambda x, y, z, gamma : 1.0
+        case 2:
+            n_lambda = lambda x, y, z, gamma : 1.0 if abs(x) < 1e-7 else 0.0
+        case 1:
+            n_lambda = lambda x, y, z, gamma : 1.0 if abs(x) < 1e-7 and abs(y) < 1e-7 else 0.0
+    if n_lambda == None:
+        raise RuntimeError(f"Dimension {dim} not allowed!")
+    moment0_0 = tile.CalculateMoment(0,0,0,n_lambda,0)
     print(f"Total fluid: {moment0_0} / {tot}")
     vx_lambda_0 = lambda x, y, z, gamma : x / gamma
     vy_lambda_0 = lambda x, y, z, gamma : y / gamma
     vz_lambda_0 = lambda x, y, z, gamma : z / gamma
-    moment1x_0 = tile.CalculateMoment(0,0,0,vx_lambda_0)
-    moment1y_0 = tile.CalculateMoment(0,0,0,vy_lambda_0)
-    moment1z_0 = tile.CalculateMoment(0,0,0,vz_lambda_0)
+    moment1x_0 = tile.CalculateMoment(0,0,0,vx_lambda_0,0)
+    moment1y_0 = tile.CalculateMoment(0,0,0,vy_lambda_0,0)
+    moment1z_0 = tile.CalculateMoment(0,0,0,vz_lambda_0,0)
     t_lambda_0 = lambda x, y, z, gamma : ((x-moment1x_0)**2 + (y-moment1y_0)**2 + (z-moment1z_0)**2)
-    temperature_0 = tile.CalculateMoment(0,0,0,t_lambda_0) * m / (3*moment0_0*k_B)
+    temperature_0 = tile.CalculateMoment(0,0,0,t_lambda_0,0) * m / (3*moment0_0*k_B)
     print(f"Temperature: {temperature_0}")
 
     iters = 0
@@ -148,38 +154,38 @@ if __name__ == "__main__":
         global grid, iters
 
         if frame == 0:
-            tile.SetVelDistribution(0,0,0,v_init)
-            tile.DebugAccelerate(0,0,0,0.0,0.0,0,1.0)
+            tile.SetVelDistribution(0,0,0,v_init,0)
+            tile.DebugAccelerate(0,0,0,0.0,0.0,0)
             iters += 1
         extra_iters = 1
         for i in range(extra_iters):
             x_acc = 0 if dim < 3 else -np.sin(-(frame*extra_iters+i)/5) * 0.5
             y_acc = 0 if dim < 2 else -np.cos(-(frame*extra_iters+i)/5) * 0.5
             z_acc = np.sin(-(frame*extra_iters+i)/5) * 0.5 
-            tile.DebugAccelerate(0,0,0,x_acc, y_acc, z_acc, 1.0)
+            tile.DebugAccelerate(0,0,0,x_acc, y_acc, z_acc)
             iters += 1
 
         if frame % 1 == 0:
-            grid = tile.GetVelDistribution(0,0,0)
+            grid = tile.GetVelDistribution(0,0,0,0)
             distributions.append(center(grid))
             itercounts.append(iters)
             # print(f"Total fluid: {sum(sum(sum(grid)))}, difference {(sum(sum(sum(grid)))/tot-1)*100} % of original")
-            moment0 = tile.CalculateMoment(0,0,0,n_lambda)
+            moment0 = tile.CalculateMoment(0,0,0,n_lambda,0)
             # print(f"Total fluid: {moment0}, difference {(moment0/moment0_0-1)*100} % if original")
             vx_lambda = lambda x, y, z, gamma : x
             vy_lambda = lambda x, y, z, gamma : y
             vz_lambda = lambda x, y, z, gamma : z
-            moment1x = tile.CalculateMoment(0,0,0,vx_lambda)
-            moment1y = tile.CalculateMoment(0,0,0,vy_lambda)
-            moment1z = tile.CalculateMoment(0,0,0,vz_lambda)
+            moment1x = tile.CalculateMoment(0,0,0,vx_lambda,0)
+            moment1y = tile.CalculateMoment(0,0,0,vy_lambda,0)
+            moment1z = tile.CalculateMoment(0,0,0,vz_lambda,0)
             t_lambda = lambda x, y, z, gamma : ((x-moment1x)**2 + (y-moment1y)**2 + (z-moment1z)**2)
-            temperature = tile.CalculateMoment(0,0,0,t_lambda) * m / (3*moment0*k_B)
+            temperature = tile.CalculateMoment(0,0,0,t_lambda,0) * m / (3*moment0*k_B)
             # print(f"Velocity: {moment1x}, {moment1y}, {moment1z}")
             print(f"Temperature: {temperature}, difference {(temperature/temperature_0-1)*100} % if original")
 
         # print(f"Total fluid: {sum(sum(grid[0]))}")
         if mode == "anim" or mode == "rel":
-            grid = tile.GetVelDistribution(0,0,0)
+            grid = tile.GetVelDistribution(0,0,0,0)
 
             if dim > 1:
                 im.set_array(grid[max_coords(grid)[0]])
