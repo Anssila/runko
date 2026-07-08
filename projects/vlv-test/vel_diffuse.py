@@ -29,7 +29,7 @@ def create_tile(x,y,z):
 
     return runko.vlv.threeD.Tile(tile_grid_idx, config)
 
-def maxwell_distr(vx, vy, vz, v_0):# refrence velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
+def maxwell_distr(vx, vy, vz, v_0):# reference velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
     return (np.pi*v_0**2)**(-1.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
 
 def maxwell_juttner(vx,vy,vz, theta, m):

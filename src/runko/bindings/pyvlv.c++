@@ -31,6 +31,21 @@ auto
 
   return pygrid;
 }
+
+auto to_6darray(vlv::Tile<3,vlv::DenseGrid>::VlasovSnapshot snapshot){
+  const auto mds = snapshot.mds();
+  const auto grid_shape = std::array{mds.extent(0), mds.extent(1), mds.extent(2), mds.extent(3), mds.extent(4), mds.extent(5)};
+  auto pygrid = py::array_t<double, py::array::c_style>(grid_shape);
+
+  auto pygridv = pygrid.template mutable_unchecked<6>();
+
+  for (const auto idx : tyvi::sstd::index_space(mds)){
+    const auto [i,j,k,l,m,n] = idx;
+    pygridv(i,j,k,l,m,n) = static_cast<double>(mds[idx][]);
+  }
+  return pygrid;
+}
+
 }  // namespace
 
 namespace vlv{
@@ -72,6 +87,7 @@ void bind_vlv(  py::module& m_sub){
         ax, ay, az
       );
     })
+    .def("set_vlv", &vlv::Tile<3, vlv::DenseGrid>::set_vlv)
     .def("Translate", &vlv::Tile<3, vlv::DenseGrid>::Translate)
     .def("accelerate", &vlv::Tile<3, vlv::DenseGrid>::accelerate)
     .def("CleanUp", &vlv::Tile<3, vlv::DenseGrid>::CleanUp)
@@ -85,7 +101,11 @@ void bind_vlv(  py::module& m_sub){
         f,
         static_cast<runko::index_t>(species)
       );
-    });
+    })
+    .def("get_vlv_snapshot", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int species) {
+      return to_6darray(tile.get_vlasov_snapshot(species));
+    })
+    .def("get_tot_energy_E", &vlv::Tile<3, vlv::DenseGrid>::get_tot_energy_E);
 
 
 //   m_3d.def("_write_average_kinetic_energy", &pic::write_average_kinetic_energy);

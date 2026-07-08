@@ -15,7 +15,13 @@ public:
     using value_type = VlasovGrid::value_type;
     using VDF = VlasovGrid::VelocityDistributionFunction; // Type for functions that define velocity space distributions for initialization
     using MCF = VlasovGrid::MomentCalculationFunction; // Type for functions that calculate moments of the velocity space
-
+    using VlasovInitFunc = std::function<double(double,double,double,double,double,double)>; // Function for initializing the whole 6D vlasov fluid
+    using VlasovSnapshot = tyvi::mdgrid_buffer< // Type for storing a full snapshot of the 6D Vlasov fluid
+        std::vector<value_type>, 
+        std::extents<std::size_t>, 
+        std::layout_right, 
+        std::extents<std::size_t,std::dynamic_extent,std::dynamic_extent,std::dynamic_extent,std::dynamic_extent,std::dynamic_extent,std::dynamic_extent>, 
+        std::layout_right>;
 
 public:
     explicit Tile(
@@ -26,6 +32,7 @@ protected:
     std::vector<VlasovContainer<VGrid>> containers_;
     static constexpr runko::index_t halo_size = static_cast<runko::index_t>(emf::halo_size);
     const std::array<runko::index_t, 3> extents_;
+    const std::array<runko::index_t, 3> velocity_extents_;
 
     // function for getting the sub mdspan not containing the halo regions
     template<typename MDS>
@@ -51,6 +58,9 @@ public:
     value_type CalculateMoment(runko::index_t x, runko::index_t y, runko::index_t z, MCF func, runko::index_t species); // Calculate a moment (specified by func) of the velocity space of the cell at x,y,z
     void deposit_current(); // Calculate and deposit the current into the yee lattice
     void accelerate(); // Accelerate the fluid using the electric field
+    void set_vlv(VlasovInitFunc func, runko::index_t species); // Initialize the Vlasov fluid using a full 6D function for the species given 
+    VlasovSnapshot get_vlasov_snapshot(runko::index_t species); // Get the data in this Tile in a 1d1v simulation
+    double get_tot_energy_E() {return this->total_energy_E();}
 };
 
 } // namespace vlv

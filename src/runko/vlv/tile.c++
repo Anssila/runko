@@ -13,6 +13,11 @@ Tile<D, VGrid>::Tile(
         static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[0]) + 2 * halo_size,
         static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[1]) + 2 * halo_size,
         static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[2]) + 2 * halo_size
+    },
+    velocity_extents_{
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents")[0]),
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents")[1]),
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents")[2])
     }
     {
 
@@ -53,11 +58,6 @@ Tile<D, VGrid>::Tile(
             .transform(qm_tuple_to_args);
     };
 
-    const auto vel_exs = conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents");
-    auto Nvx = static_cast<runko::index_t>(vel_exs[0]);
-    auto Nvy = static_cast<runko::index_t>(vel_exs[1]);
-    auto Nvz = static_cast<runko::index_t>(vel_exs[2]);
-
     // We get either u_max or u_res and deduce the other based on the extents
     auto u_max = conf.get<std::vector<double>>("u_max");
     auto u_res = conf.get<std::vector<double>>("u_res");
@@ -90,7 +90,7 @@ Tile<D, VGrid>::Tile(
         if(const auto vcontainer_args = make_opt_args(q_label, m_label)) {
             auto args = vcontainer_args.value();
             args.spatial_extents = extents_;
-            args.velocity_extents = {Nvx, Nvy, Nvz};
+            args.velocity_extents = velocity_extents_;
             args.u_init = init_values;
             args.init_func = init_func;
             containers_.emplace_back(vlv::VlasovContainer<VGrid> { args });
@@ -115,9 +115,10 @@ void Tile<D, VGrid>::DebugAccelerate(runko::index_t x, runko::index_t y, runko::
 
     for (auto& species : containers_){
         const auto mds = species.mds();
+        const auto qpm = static_cast<value_type>(species.charge() / species.mass());
         auto idx = std::array<runko::index_t,3>{x,y,z};
         AssertInside(idx); 
-        mds[idx][].Shift(w, ax_, ay_, az_);
+        mds[idx][].Shift(w, qpm*ax_, qpm*ay_, qpm*az_);
     }
     w.wait();
 }
@@ -136,6 +137,50 @@ VlasovGrid& Tile<D, VGrid>::GetVelGrid(runko::index_t x, runko::index_t y, runko
     AssertInside(idx); 
     const auto mds = containers_[species].mds();
     return mds[idx][];
+}
+
+template<std::size_t D, VelGridType VGrid>
+void Tile<D, VGrid>::set_vlv(Tile<D,VGrid>::VlasovInitFunc func, runko::index_t species){
+    const auto nh_mds = nonhalo_submds(containers_[species].mds());
+    for (auto idx : tyvi::sstd::index_space(nh_mds)){
+        const double x = static_cast<double>(idx[0]) + 0.5;
+        const double y = static_cast<double>(idx[1]) + 0.5;
+        const double z = static_cast<double>(idx[2]) + 0.5;
+        nh_mds[idx][].SetGridData( [=] (double ux, double uy, double uz) { return func(x,y,z,ux,uy,uz); } );
+    }
+}
+
+
+template<std::size_t D, VelGridType VGrid>
+Tile<D, VGrid>::VlasovSnapshot Tile<D, VGrid>::get_vlasov_snapshot(runko::index_t species){
+
+    const auto nh_mds = nonhalo_submds(containers_[species].mds());
+    auto snapshot = VlasovSnapshot(
+        nh_mds.extent(0),     nh_mds.extent(1),     nh_mds.extent(2), 
+        velocity_extents_[0], velocity_extents_[1], velocity_extents_[2]
+    );
+    const auto snapshot_mds = snapshot.mds();
+
+    static_assert(std::is_convertible_v<VGrid*, DenseGrid*>); // TODO: properly handle other kinds of VlasovGrids
+
+    for (auto idx : tyvi::sstd::index_space(nh_mds)){
+        const auto grid = static_cast<vlv::DenseGrid&>(GetVelGrid(
+            static_cast<runko::index_t>(idx[0]) + emf::halo_size,
+            static_cast<runko::index_t>(idx[1]) + emf::halo_size,
+            static_cast<runko::index_t>(idx[2]) + emf::halo_size,
+            species
+        ));
+        const auto grid_mds = grid.GetStagingMDS();
+        for (auto jdx : tyvi::sstd::index_space(grid_mds)){
+            const auto snapshot_idx = std::array<std::size_t,6>{
+                idx[0],idx[1],idx[2],
+                jdx[0],jdx[1],jdx[2]
+            };
+            snapshot_mds[snapshot_idx][] = grid_mds[jdx][];
+        }
+    }
+
+    return snapshot;
 }
 
 template<std::size_t D, VelGridType VGrid>
@@ -217,6 +262,10 @@ void Tile<D, VGrid>::DebugBC(){
     }
 
     w.wait();
+
+    // Also do periodic BCs for the Yee-lattice
+    this->yee_lattice_.set_E_in_subregion({0,0,-1}, this->yee_lattice_);
+    this->yee_lattice_.set_E_in_subregion({0,0, 1}, this->yee_lattice_);
 }
 
 template<std::size_t D, VelGridType VGrid>

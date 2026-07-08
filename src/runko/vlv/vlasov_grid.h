@@ -92,7 +92,11 @@ public:
 
     value_type DebugGetTotalFluid() const override;
     value_type DebugGetFluid(std::array<runko::index_t,3> inds) const; // Debug function to get the fluid in a grid cell
-    auto GetStagingMDS() const { return grid_->staging_mds(); }
+    auto GetStagingMDS() const { 
+        const auto w = tyvi::mdgrid_work{};
+        w.sync_to_staging(*grid_).wait();
+        return grid_->staging_mds(); 
+    }
     auto GetMDS() const { return grid_->mds(); }
     auto GetExtents() const { return extents_; }
 
