@@ -29,7 +29,7 @@ def create_tile(config = None):
     tile = runko.vlv.threeD.Tile(tile_grid_idx, config)
     return tile
 
-class vlv_tile(unittest.TestCase):
+class vlv_tile_general(unittest.TestCase):
 
     def test_tile_empty(self):
         config = basic_config()
@@ -42,7 +42,6 @@ class vlv_tile(unittest.TestCase):
             self.assertEqual(10, len(grid))
             self.assertEqual(10, len(grid[0]))
             self.assertEqual(10, len(grid[0][0]))
-
             for slice in grid:
                 for row in slice:
                     for value in row:
@@ -263,127 +262,46 @@ class vlv_tile(unittest.TestCase):
             tot += sum(sum(sum(tile.GetVelDistribution(1,1,i,0))))
         self.assertAlmostEqual(tot, config.n_cells_per_tile[2]*125*14)
 
-    def test_moment_calculation(self):
-        # Test that moments of the velocity distribution are calculated correctly
-        dU = 0.2
-        k_B = 0.1
-        T = 1.0
-        m = 1.0
-        theta = k_B*T/m
+    def test_set_vlv(self):
         config = basic_config()
+        config.n_cells_per_tile = [5,5,5]
+        config.v_grid_extents = [11,11,11]
         config.u_max = None
-        config.u_res = [dU,dU,dU]
+        config.u_res = [0.1,0.1,0.1]
         tile = create_tile(config)
 
-        def maxwell_juttner(vx,vy,vz, theta, m):
-            return 1.0/(4.0*np.pi*theta*kn(2,1.0/theta))*np.exp(-np.sqrt(1.0+vx**2+vy**2+vz**2)/theta)/m**3
+        vlv_init = lambda x, y, z, ux, uy, uz : np.exp(-(ux-x/15)**2 - (uy-y/15)**2 - (uz-z/15)**2)
 
-        v_init = lambda x, y, z : maxwell_juttner(x,y,z, theta, m)
-        tile.SetVelDistribution(1,1,1, v_init,0)
-        grid = tile.GetVelDistribution(1,1,1,0)
-        tot = sum(sum(sum(grid))) * dU**3
+        tile.set_vlv(vlv_init,0)
 
-        # Test that number density is calculated correctly
-        n_lambda = lambda x, y, z, gamma : 1.0
-        moment0 = tile.CalculateMoment(1,1,1,n_lambda,0)
-        self.assertAlmostEqual(tot/moment0, 1.0, 5)
+        for x_,y_,z_ in itertools.product(range(config.n_cells_per_tile[0]), range(config.n_cells_per_tile[1]), range(config.n_cells_per_tile[2])):
+            grid = tile.GetVelDistribution(x_,y_,z_,0)
+            for ux, uy, uz in itertools.product(range(config.v_grid_extents[0]), range(config.v_grid_extents[1]), range(config.v_grid_extents[2])):
+                self.assertAlmostEqual(grid[ux][uy][uz], vlv_init( \
+                    x_+0.5, y_+0.5, z_+0.5, \
+                    ux/10.0-0.5, uy/10.0-0.5, uz/10.0-0.5  \
+                ))
 
-        # Create tile in a way to have a good distribution for temperature calculation
-        config.u_max = [10.0, 10.0, 10.0]
-        config.u_res = None
-        config.v_grid_extents = [50,50,50]
-        tile = create_tile(config)
-        tile.SetVelDistribution(1,1,1,v_init,0)
-        moment0_0 = tile.CalculateMoment(1,1,1,n_lambda,0)
-
-        # Test that the bulk velocity is zero in all directions
-        vx_lambda = lambda x, y, z, gamma : x
-        vy_lambda = lambda x, y, z, gamma : y
-        vz_lambda = lambda x, y, z, gamma : z
-        moment1x = tile.CalculateMoment(1,1,1,vx_lambda,0)
-        moment1y = tile.CalculateMoment(1,1,1,vy_lambda,0)
-        moment1z = tile.CalculateMoment(1,1,1,vz_lambda,0)
-        self.assertAlmostEqual(moment1x, 0.0, 1)
-        self.assertAlmostEqual(moment1y, 0.0, 1)
-        self.assertAlmostEqual(moment1z, 0.0, 1)
-
-        # Test (non-relativistic) temperature calculation using bulk velocity
-        t_lambda = lambda x, y, z, gamma : ((x-moment1x)**2 + (y-moment1y)**2 + (z-moment1z)**2)
-        temperature = tile.CalculateMoment(1,1,1,t_lambda,0) * m / (3*moment0_0*k_B)
-        self.assertAlmostEqual(temperature, T, 0)
-
-        # Test that bulk velocity is non-zero after acceleration
-        tile.DebugAccelerate(1,1,1, 5.0, -2.0, 7.0)
-        moment0 = tile.CalculateMoment(1,1,1,n_lambda,0)
-        self.assertAlmostEqual(moment0_0/moment0, 1.0, 5)
-        moment1x = tile.CalculateMoment(1,1,1,vx_lambda,0)
-        moment1y = tile.CalculateMoment(1,1,1,vy_lambda,0)
-        moment1z = tile.CalculateMoment(1,1,1,vz_lambda,0)
-
-        self.assertAlmostEqual(moment1x, 5.0,2)
-        self.assertAlmostEqual(moment1y, -2.0,2)
-        self.assertAlmostEqual(moment1z, 7.0,2)
-
-    def test_current_deposition(self):
-        dU = 0.0002
-        k_B = 0.1
-        T = 0.00001
-        m = 1.0
-        v_0 = np.sqrt(2*k_B*T/m)
+    def test_snapshot(self):
         config = basic_config()
+        config.n_cells_per_tile = [4,6,8]
+        config.v_grid_extents = [3,5,7]
         config.u_max = None
-        config.u_res = [dU,dU,dU]
-        config.v_grid_extents = [50,50,50]
-        config.q0 = 3.0
-        config.cfl = 0.5
+        config.u_res = [0.1,0.1,0.1]
         tile = create_tile(config)
 
-        def maxwell_distr(vx, vy, vz, v_0):# reference velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
-            return (np.pi*v_0**2)**(-1.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
+        vlv_init = lambda x, y, z, ux, uy, uz : x + 2*y + 3*z + 4*ux + 5*uy + 6*uz
 
-        v_init = lambda x, y, z : maxwell_distr(x,y,z, v_0)
-        tile.SetVelDistribution(1,1,1, v_init,0)
-        n_lambda = lambda x, y, z, gamma : 1.0
-        moment0 = tile.CalculateMoment(1,1,1,n_lambda,0)
+        tile.set_vlv(vlv_init,0)
 
-        # Make sure that the fluid is initialized correctly
-        self.assertAlmostEqual(moment0, 1.0, 1)
-
-        # Test that J is zero everywhere before the deposition
-        (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
-        self.assertTrue(np.all(J0x == 0))
-        self.assertTrue(np.all(J0y == 0))
-        self.assertTrue(np.all(J0z == 0))
-
-        # Test that J is non zero after the deposition
-        Exinit = lambda x, y, z : x - x
-        Eyinit = lambda x, y, z : y - y
-        Ezinit = lambda x, y, z : z - z
-        Bxinit = lambda x, y, z : 2 * x
-        Byinit = lambda x, y, z : 2 * y
-        Bzinit = lambda x, y, z : 2 * z
-        Jxinit = lambda x, y, z : 3 * x
-        Jyinit = lambda x, y, z : 3 * y
-        Jzinit = lambda x, y, z : 3 * z
-
-        tile.batch_set_EBJ(Exinit, Eyinit, Ezinit,
-                           Bxinit, Byinit, Bzinit,
-                           Jxinit, Jyinit, Jzinit)
-        tile.deposit_current()
-        (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
-        self.assertAlmostEqual(J0x[1][1][1], 0.0)
-        self.assertAlmostEqual(J0y[1][1][1], 0.0)
-        self.assertAlmostEqual(J0z[1][1][1], 0.0)
-
-        tile.DebugAccelerate(1,1,1,dU, -2*dU, 3*dU)
-        tile.deposit_current()
-        tile.add_current()
-
-        (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
-        self.assertAlmostEqual(J0x[1][1][1], dU * config.q0 * config.cfl)
-        self.assertAlmostEqual(J0y[1][1][1], -2*dU * config.q0 * config.cfl)
-        self.assertAlmostEqual(J0z[1][1][1], 3*dU * config.q0 * config.cfl)
-
+        snapshot = tile.get_vlv_snapshot(0)
+        for x_,y_,z_,ux,uy,uz in itertools.product(\
+            range(config.n_cells_per_tile[0]), range(config.n_cells_per_tile[1]), range(config.n_cells_per_tile[2]),\
+            range(config.v_grid_extents[0]), range(config.v_grid_extents[1]), range(config.v_grid_extents[2])):
+            self.assertAlmostEqual(snapshot[x_][y_][z_][ux][uy][uz], vlv_init( \
+                x_+0.5, y_+0.5, z_+0.5, \
+                (ux-1)*0.1, (uy-2)*0.1, (uz-3)*0.1  \
+            ),5)
 
 if __name__ == "__main__":
     unittest.main()
