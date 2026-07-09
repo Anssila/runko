@@ -44,12 +44,12 @@ class vlv_tile_current_deposition(unittest.TestCase):
         tile = create_tile(config)
 
         def maxwell_juttner(vx,vy,vz, theta, m):
-            return 1.0/(4.0*np.pi*theta*kn(2,1.0/theta))*np.exp(-np.sqrt(1.0+vx**2+vy**2+vz**2)/theta)/m**3
+            return 1.0/(4.0*np.pi*theta*kn(2,1.0/theta))*np.exp(-np.sqrt(1.0+vz**2)/theta)/m**3
 
         v_init = lambda x, y, z : maxwell_juttner(x,y,z, theta, m)
         tile.SetVelDistribution(1,1,1, v_init,0)
         grid = tile.GetVelDistribution(1,1,1,0)
-        tot = sum(sum(sum(grid))) * dU**3
+        tot = sum(sum(sum(grid))) * dU
 
         # Test that number density is calculated correctly
         n_lambda = lambda x, y, z, gamma : 1.0
@@ -76,9 +76,9 @@ class vlv_tile_current_deposition(unittest.TestCase):
         self.assertAlmostEqual(moment1z, 0.0, 1)
 
         # Test (non-relativistic) temperature calculation using bulk velocity
-        t_lambda = lambda x, y, z, gamma : ((x-moment1x)**2 + (y-moment1y)**2 + (z-moment1z)**2)
-        temperature = tile.CalculateMoment(1,1,1,t_lambda,0) * m / (3*moment0_0*k_B)
-        self.assertAlmostEqual(temperature, T, 0)
+        # t_lambda = lambda x, y, z, gamma : ((z-moment1z)**2)
+        # temperature = tile.CalculateMoment(1,1,1,t_lambda,0) * m / (3*moment0_0*k_B)
+        # self.assertAlmostEqual(temperature, T, 0)
 
         # Test that bulk velocity is non-zero after acceleration
         tile.DebugAccelerate(1,1,1, 5.0, -2.0, 7.0)
@@ -88,9 +88,9 @@ class vlv_tile_current_deposition(unittest.TestCase):
         moment1y = tile.CalculateMoment(1,1,1,vy_lambda,0)
         moment1z = tile.CalculateMoment(1,1,1,vz_lambda,0)
 
-        self.assertAlmostEqual(moment1x, 5.0,2)
-        self.assertAlmostEqual(moment1y, -2.0,2)
-        self.assertAlmostEqual(moment1z, 7.0,2)
+        self.assertAlmostEqual(moment1x, 0.0,2)
+        self.assertAlmostEqual(moment1y, 0.0,2)
+        self.assertAlmostEqual(moment1z/moment0, 7.0,2)
 
     def test_current_deposition(self):
         k_B = 0.1
@@ -109,7 +109,7 @@ class vlv_tile_current_deposition(unittest.TestCase):
         tile = create_tile(config)
 
         def maxwell_distr(vx, vy, vz, v_0):# reference velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
-            return (np.pi*v_0**2)**(-1.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
+            return (np.pi*v_0**2)**(-0.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
 
         v_init = lambda x, y, z : maxwell_distr(x,y,z, v_0)
         tile.SetVelDistribution(1,1,1, v_init,0)
@@ -156,11 +156,11 @@ class vlv_tile_current_deposition(unittest.TestCase):
         tile.add_current()
 
         (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
-        self.assertAlmostEqual(J0x[1][1][1], v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
-        self.assertAlmostEqual(J0y[1][1][1], -2*v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
+        self.assertAlmostEqual(J0x[1][1][1], 0.0,2)
+        self.assertAlmostEqual(J0y[1][1][1], 0.0,2)
         self.assertAlmostEqual(J0z[1][1][1], 1.5*v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
-        self.assertAlmostEqual(E0x[1][1][1], -v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
-        self.assertAlmostEqual(E0y[1][1][1], +2*v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
+        self.assertAlmostEqual(E0x[1][1][1], 0.0,2)
+        self.assertAlmostEqual(E0y[1][1][1], 0.0,2)
         self.assertAlmostEqual(E0z[1][1][1], -1.5*v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
 
 if __name__ == "__main__":

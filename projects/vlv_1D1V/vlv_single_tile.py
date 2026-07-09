@@ -25,11 +25,11 @@ if __name__ == "__main__":
     config.u_max = [2.0,2.0,2.0]
     config.cfl = 0.5
     config.field_propagator = "fdtd2"
-    config.q0 = 0.05
-    config.q1 = 0.05
+    config.q0 = 0.02
+    config.q1 = 0.02
     config.m0 = 1.0
     config.m1 = 1.0
-    v_0 = config.u_max[2]/20.0
+    v_0 = config.u_max[2]/40.0
 
     noise_A = 1e-7
     noise_f = 4*np.pi/spatial_ex
@@ -39,14 +39,14 @@ if __name__ == "__main__":
     J0 = lambda x, y, z: (0, 0, 0)
 
     def vlv0(x,y,z,ux,uy,uz):
-        if abs(x-1.5) > 0.01 or abs(y-1.5) > 0.01 or abs(ux) > 1e-6 or abs(uy) > 1e-6:
-            return 0
+        # if abs(x-0.5) > 0.01 or abs(y-0.5) > 0.01 or abs(ux) > 1e-6 or abs(uy) > 1e-6:
+        #     return 0
         global v_0
         return (np.pi*v_0**2)**(-0.5) * (np.exp(-(uz-10.0*v_0)**2/v_0**2) ) * (1+np.cos(noise_f*z)*noise_A)
 
     def vlv1(x,y,z,ux,uy,uz):
-        if abs(x-1.5) > 0.01 or abs(y-1.5) > 0.01 or abs(ux) > 1e-6 or abs(uy) > 1e-6:
-            return 0
+        # if abs(x-1.5) > 0.01 or abs(y-1.5) > 0.01 or abs(ux) > 1e-6 or abs(uy) > 1e-6:
+        #     return 0
         global v_0
         return (np.pi*v_0**2)**(-0.5) * (np.exp(-(uz+10.0*v_0)**2/v_0**2)) * (1+np.cos(noise_f*z)*noise_A)
 
@@ -55,8 +55,8 @@ if __name__ == "__main__":
     tile.set_vlv(vlv0, 0)
     tile.set_vlv(vlv1, 1)
 
-    data0 = np.rot90(tile.get_vlv_snapshot(0)[1,1,:,1,1,:])
-    data1 = np.rot90(tile.get_vlv_snapshot(1)[1,1,:,1,1,:])
+    data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
+    data1 = np.rot90(tile.get_vlv_snapshot(1)[0,0,:,1,1,:])
     (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
     e_data = E0z[1][1]
     j_data = J0z[1][1]
@@ -84,8 +84,8 @@ if __name__ == "__main__":
             tile.set_EBJ(E0, B0, J0)
             tile.set_vlv(vlv0, 0)
             tile.set_vlv(vlv1, 1)
-            data0 = np.rot90(tile.get_vlv_snapshot(0)[1,1,:,1,1,:])
-            data1 = np.rot90(tile.get_vlv_snapshot(1)[1,1,:,1,1,:])
+            data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
+            data1 = np.rot90(tile.get_vlv_snapshot(1)[0,0,:,1,1,:])
             im[0].set_array(data0 + data1)
             (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
             e_data = E0z[1][1]
@@ -101,8 +101,8 @@ if __name__ == "__main__":
             tile.accelerate()
             tile.deposit_current()
             tile.add_current()
-        data0 = np.rot90(tile.get_vlv_snapshot(0)[1,1,:,1,1,:])
-        data1 = np.rot90(tile.get_vlv_snapshot(1)[1,1,:,1,1,:])
+        data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
+        data1 = np.rot90(tile.get_vlv_snapshot(1)[0,0,:,1,1,:])
         im[0].set_array(data0 + data1)
         (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
         e_data = E0z[1][1]

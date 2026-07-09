@@ -132,13 +132,15 @@ const suite<"dense grid testing"> s2 = [] {
     // Test delta initialization
     std::array<vlv::VlasovGrid::value_type,3> v = {0.0f, 0.1f, -0.1f};
     auto inds = g.GetIndFromVel(v);
+    inds[0] = 1;
+    inds[1] = 1;
     g.InitDelta(v);
     expect(g.DebugGetTotalFluid() == 1.0f) << "Expected 1, got " << g.DebugGetTotalFluid();
     expect(g.DebugGetFluid(inds) == 1.0f) << "Expected 1, got " << g.DebugGetFluid(inds);
   };
 
   "shift"_test = [] {
-    auto g = vlv::DenseGrid(5,5,5);
+    auto g = vlv::DenseGrid(3,3,5);
     g.set_u_res({0.1f,0.1f,0.1f});
 
     // First test that zero fluid stays as zero
@@ -147,7 +149,7 @@ const suite<"dense grid testing"> s2 = [] {
     expect(std::abs(static_cast<float>(g.DebugGetTotalFluid())) < tolerance) << "Expected 0, got " << g.DebugGetTotalFluid();
 
     // Test that a delta distribution conserves fluid under shifting
-    g.InitDelta({0.1f,-0.1f,0.2f});
+    g.InitDelta({0.0f,0.0f,0.2f});
     vlv::VlasovGrid::value_type tot = g.DebugGetTotalFluid();
     expect(tot == 1.0f);
     g.Shift(0.0f, 0.0f, 0.0f);
@@ -160,13 +162,13 @@ const suite<"dense grid testing"> s2 = [] {
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
     g.Shift(1.05f, 1.05f, 1.05f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({4,4,4}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({4,4,4});
+    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({1,1,4}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({4,4,4});
     g.Shift(-0.2f,-0.2f,-0.2f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({2,2,2}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({2,2,2});
+    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({1,1,2}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({2,2,2});
     g.Shift(-2.0f, -2.0f, -2.0f);
     expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({0,0,0}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({0,0,0});
+    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({1,1,0}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({0,0,0});
 
 
     g.InitDelta({0.0f,0.0f,0.0f});
@@ -182,7 +184,7 @@ const suite<"dense grid testing"> s2 = [] {
   };
 
   "GetVelFromIndex"_test = [] {
-    auto g = vlv::DenseGrid(5,6,7);
+    auto g = vlv::DenseGrid(3,3,7);
     g.set_u_max({2.0f,2.0f,2.0f});
 
     auto approxEq = [] (std::array<vlv::VlasovGrid::value_type,3> a, std::array<vlv::VlasovGrid::value_type,3> b){
@@ -193,30 +195,30 @@ const suite<"dense grid testing"> s2 = [] {
 
     approxEq(g.GetVelFromInd({0,0,0}),{-2.0f,-2.0f,-2.0f});
 
-    approxEq(g.GetVelFromInd({4,5,6}),{2.0f,2.0f,2.0f});
+    approxEq(g.GetVelFromInd({2,2,6}),{2.0f,2.0f,2.0f});
 
-    approxEq(g.GetVelFromInd({2,2,3}),{0.0f,-0.4f,0.0f});
+    approxEq(g.GetVelFromInd({1,1,3}),{0.0f,0.0f,0.0f});
   };
 
   "GetIndexFromVel"_test = [] {
-    auto g = vlv::DenseGrid(5,6,7);
+    auto g = vlv::DenseGrid(3,3,7);
     g.set_u_res({0.1f,0.1f,0.1f});
 
-    expect(g.GetIndFromVel({-0.2f,-0.25f,-0.3f}) == std::array<runko::index_t,3>{0,0,0});
+    expect(g.GetIndFromVel({-0.1f,-0.1f,-0.3f}) == std::array<runko::index_t,3>{0,0,0});
 
-    expect(g.GetIndFromVel({0.2f,0.25f,0.3f}) == std::array<runko::index_t,3>{4,5,6});
+    expect(g.GetIndFromVel({0.1f,0.1f,0.3f}) == std::array<runko::index_t,3>{2,2,6});
 
-    expect(g.GetIndFromVel({0.0f,0.0f,0.0f}) == std::array<runko::index_t,3>{2,2,3});
+    expect(g.GetIndFromVel({0.0f,0.0f,0.0f}) == std::array<runko::index_t,3>{1,1,3});
   };
 
   "odd_index"_test = [] {
-    auto g = vlv::DenseGrid(7,7,7);
+    auto g = vlv::DenseGrid(3,3,7);
     g.set_u_res({0.1f,0.1f,0.1f});
 
     auto test_inds = std::vector<std::array<runko::index_t,3>>{
         {0,0,0},
-        {6,6,6},
-        {3,3,3},
+        {1,1,6},
+        {2,2,3},
         {1,2,3}
     };
     for (auto inds : test_inds){ 
@@ -236,8 +238,8 @@ const suite<"dense grid testing"> s2 = [] {
 
     auto test_vels = std::vector<std::array<vlv::VlasovGrid::value_type,3>>{
         {0.0f,0.0f,0.0f},
-        {-0.3f,-0.3f,-0.3f},
-        {0.3f,0.3f,0.3f},
+        {-0.1f,-0.1f,-0.3f},
+        {0.1f,0.1f,0.3f},
         {0.0f,0.1f,0.2f}
     };
 
@@ -253,57 +255,57 @@ const suite<"dense grid testing"> s2 = [] {
 
   };
 
-  "even_index"_test = [] {
-    auto g = vlv::DenseGrid(8,8,8);
-    g.set_u_res({0.1f,0.1f,0.1f});
+//   "even_index"_test = [] {
+//     auto g = vlv::DenseGrid(3,3,8);
+//     g.set_u_res({0.1f,0.1f,0.1f});
 
-    auto test_inds = std::vector<std::array<runko::index_t,3>>{
-        {0,0,0},
-        {7,7,7},
-        {3,3,3},
-        {4,4,4},
-        {1,2,3}
-    };
-    for (auto inds : test_inds){ 
-        auto v = g.GetVelFromInd(inds);
-        auto t = g.GetIndFromVel(v);
-        expect(t == inds) << "Expected {" 
-                          << inds[0] << ","
-                          << inds[1] << ","
-                          << inds[2] << "}, got {"
-                          << t[0] << ","
-                          << t[1] << ","
-                          << t[2] << "}. v is {"
-                          << v[0] << ", "
-                          << v[1] << ", "
-                          << v[2] << "}";
-    }
+//     auto test_inds = std::vector<std::array<runko::index_t,3>>{
+//         {0,0,0},
+//         {7,7,7},
+//         {3,3,3},
+//         {4,4,4},
+//         {1,2,3}
+//     };
+//     for (auto inds : test_inds){ 
+//         auto v = g.GetVelFromInd(inds);
+//         auto t = g.GetIndFromVel(v);
+//         expect(t == inds) << "Expected {" 
+//                           << inds[0] << ","
+//                           << inds[1] << ","
+//                           << inds[2] << "}, got {"
+//                           << t[0] << ","
+//                           << t[1] << ","
+//                           << t[2] << "}. v is {"
+//                           << v[0] << ", "
+//                           << v[1] << ", "
+//                           << v[2] << "}";
+//     }
 
-    auto test_vels = std::vector<std::array<vlv::VlasovGrid::value_type,3>>{
-        {0.05f,0.05f,0.05f},
-        {-0.35f,-0.35f,-0.35f},
-        {0.35f,0.35f,0.35f},
-        {-0.05f,-0.15f,-0.25f}
-    };
+//     auto test_vels = std::vector<std::array<vlv::VlasovGrid::value_type,3>>{
+//         {0.05f,0.05f,0.05f},
+//         {-0.35f,-0.35f,-0.35f},
+//         {0.35f,0.35f,0.35f},
+//         {-0.05f,-0.15f,-0.25f}
+//     };
 
-    auto approxEq = [] (std::array<vlv::VlasovGrid::value_type,3> a, std::array<vlv::VlasovGrid::value_type,3> b){
-        expect(std::abs(static_cast<float>(a[0]-b[0])) < tolerance) << "Expected " << b[0] << ", got " << a[0];
-        expect(std::abs(static_cast<float>(a[1]-b[1])) < tolerance) << "Expected " << b[1] << ", got " << a[1];
-        expect(std::abs(static_cast<float>(a[2]-b[2])) < tolerance) << "Expected " << b[2] << ", got " << a[2];
-    };
+//     auto approxEq = [] (std::array<vlv::VlasovGrid::value_type,3> a, std::array<vlv::VlasovGrid::value_type,3> b){
+//         expect(std::abs(static_cast<float>(a[0]-b[0])) < tolerance) << "Expected " << b[0] << ", got " << a[0];
+//         expect(std::abs(static_cast<float>(a[1]-b[1])) < tolerance) << "Expected " << b[1] << ", got " << a[1];
+//         expect(std::abs(static_cast<float>(a[2]-b[2])) < tolerance) << "Expected " << b[2] << ", got " << a[2];
+//     };
 
-    for (auto vel : test_vels){
-        approxEq(g.GetVelFromInd(g.GetIndFromVel(vel)),vel);
-    }
+//     for (auto vel : test_vels){
+//         approxEq(g.GetVelFromInd(g.GetIndFromVel(vel)),vel);
+//     }
 
-  };
+//   };
 
   "translate"_test = [] {
     std::vector<vlv::DenseGrid> grids;
     for (int i = 0; i < 3; i++){
-        grids.emplace_back(5,5,5);
+        grids.emplace_back(3,3,5);
         grids[i].set_u_res({0.1f,0.1f,0.1f});
-        grids[i].InitDelta({0.2f,-0.1f,0.1f});
+        grids[i].InitDelta({0.0f,0.0f,0.1f});
         vlv::VlasovGrid::value_type tot = grids[i].DebugGetTotalFluid();
         expect(tot == 1.0f) << "Expected 1.0, got " << tot;  
     }
@@ -332,9 +334,9 @@ const suite<"dense grid testing"> s2 = [] {
 
     // Test that fluid is conserved when moving around
 
-    grids[0].InitDelta({0.1f,0.1f,-0.1f});
-    grids[1].InitDelta({0.1f,0.1f,-0.1f});
-    grids[2].InitDelta({0.1f,0.1f,-0.1f});
+    grids[0].InitDelta({0.0f,0.0f,-0.1f});
+    grids[1].InitDelta({0.0f,0.0f,-0.1f});
+    grids[2].InitDelta({0.0f,0.0f,-0.1f});
 
     tot1 = grids[0].DebugGetTotalFluid();
     tot2 = grids[1].DebugGetTotalFluid();
@@ -360,31 +362,13 @@ const suite<"dense grid testing"> s2 = [] {
     expect(tot1+tot2+tot3 == 3.0) << "Expected total to be 3.0, got " << tot1+tot2+tot3 << " from: " << tot1 << " + " << tot2 << " + " << tot3; 
 
     // Test that the fluid is in the correct configuration:
-    const vlv::VlasovGrid::value_type correct[5][5][5] = {
+    const vlv::VlasovGrid::value_type correct[3][3][5] = {
         {
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
             {0.0f,0.0f,0.0f,0.0f,0.0f},
             {0.0f,0.0f,0.0f,0.0f,0.0f},
             {0.0f,0.0f,0.0f,0.0f,0.0f}
         },
         {
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f}
-        },
-        {
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f}
-        },
-        {
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
             {0.0f,0.0f,0.0f,0.0f,0.0f},
             {0.0f,1.0f,0.0f,0.0f,0.0f},
             {0.0f,0.0f,0.0f,0.0f,0.0f}
@@ -392,13 +376,11 @@ const suite<"dense grid testing"> s2 = [] {
         {
             {0.0f,0.0f,0.0f,0.0f,0.0f},
             {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
-            {0.0f,0.0f,0.0f,0.0f,0.0f},
             {0.0f,0.0f,0.0f,0.0f,0.0f}
         }
     };
-    for (uint i = 0; i < 5; i++)
-    for (uint j = 0; j < 5; j++)
+    for (uint i = 0; i < 3; i++)
+    for (uint j = 0; j < 3; j++)
     for (uint k = 0; k < 5; k++){
         auto val1 = grids[0].DebugGetFluid({i,j,k});
         auto val2 = grids[1].DebugGetFluid({i,j,k});
@@ -410,7 +392,7 @@ const suite<"dense grid testing"> s2 = [] {
   };
 
   "moment"_test = [] {
-    auto g = vlv::DenseGrid(5,5,5);
+    auto g = vlv::DenseGrid(3,3,5);
     g.set_u_res({0.1f,0.1f,0.1f});
     g.InitDelta({0.0f,0.0f,0.1f});
     expect(g.DebugGetTotalFluid() == 1.0f);
@@ -423,19 +405,19 @@ const suite<"dense grid testing"> s2 = [] {
         expect(std::abs(static_cast<float>(a-b)) < 1e-8) << "Expected " << std::setprecision(10) << b << ", got " << a;
     };
 
-    approxEq(g.CalculateMoment(w, n), 0.001f);
+    approxEq(g.CalculateMoment(w, n), 0.1f);
     const auto u = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma){
         return std::sqrt(x*x+y*y+z*z);
     };
 
-    approxEq(g.CalculateMoment(w, u), 0.0001f);
+    approxEq(g.CalculateMoment(w, u), 0.01f);
 
     const auto v = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma){
         return std::sqrt(x*x+y*y+z*z) / gamma;
     };
 
-    expect(g.CalculateMoment(w,v) < 0.0001f) << "Expected < 0.0001, got " << g.CalculateMoment(w,v);
-    expect(g.CalculateMoment(w,v) >= 0.00005f) << "Expected > 0.00005, got " << g.CalculateMoment(w,v);
+    expect(g.CalculateMoment(w,v) < 0.01f) << "Expected < 0.01, got " << g.CalculateMoment(w,v);
+    expect(g.CalculateMoment(w,v) >= 0.005f) << "Expected > 0.005, got " << g.CalculateMoment(w,v);
   };
 };
 

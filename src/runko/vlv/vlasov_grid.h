@@ -18,11 +18,11 @@ public:
 
 
     // implement shift operator using strang-splitting
-    void Shift(const tyvi::mdgrid_work& w, value_type dx, value_type dy, value_type dz){
+    void Shift(const tyvi::mdgrid_work& w, [[maybe_unused]] value_type dx, [[maybe_unused]] value_type dy, value_type dz){
         // TODO do correct strang-splitting, for now just do full shift sequentially for every dir 
         // TODO or should shift be done fully 3d?
-        Shift_dir(w, dx, 0);
-        Shift_dir(w, dy, 1);
+        // Shift_dir(w, dx, 0);
+        // Shift_dir(w, dy, 1);
         Shift_dir(w, dz, 2);
     }
     // overload Shift for a non-async version 

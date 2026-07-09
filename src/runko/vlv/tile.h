@@ -38,10 +38,19 @@ protected:
     template<typename MDS>
     auto nonhalo_submds(MDS&& mds) const
     {
-        const auto extents = this->yee_lattice_.extents_wout_halo();
-        const auto x = std::tuple { halo_size, halo_size + extents[0] };
-        const auto y = std::tuple { halo_size, halo_size + extents[1] };
-        const auto z = std::tuple { halo_size, halo_size + extents[2] };
+        const auto x = std::tuple { 0, 1 };
+        const auto y = std::tuple { 0, 1 };
+        const auto z = std::tuple { halo_size, extents_[2] - halo_size };
+
+        return std::submdspan(std::forward<MDS>(mds), x, y, z);
+    }
+
+    template<typename MDS>
+    auto emf_nonhalo_submds(MDS&& mds) const
+    {
+        const auto x = std::tuple { halo_size+1, halo_size+2 };
+        const auto y = std::tuple { halo_size+1, halo_size+2 };
+        const auto z = std::tuple { halo_size, extents_[2] - halo_size };
 
         return std::submdspan(std::forward<MDS>(mds), x, y, z);
     }

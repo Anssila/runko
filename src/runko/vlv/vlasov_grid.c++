@@ -139,6 +139,11 @@ void DenseGrid::TranslateZ(const tyvi::mdgrid_work& w, std::vector<VlasovGrid*> 
         int32_t min_ind = static_cast<int32_t>(min) + static_cast<int32_t>((mds_grids.size()-1)/2);
         int32_t max_ind = static_cast<int32_t>(max) + static_cast<int32_t>((mds_grids.size()-1)/2);
 
+        if (min_ind < 0 || min_ind >= static_cast<int32_t>(mds_grids.size()))
+            throw std::range_error(std::format("Invalid index: {}, extent is {}\n", min_ind, mds_grids.size()));
+        if (max_ind < 0 || max_ind >= static_cast<int32_t>(mds_grids.size()))
+            throw std::range_error(std::format("Invalid index: {}, extent is {}\n", max_ind, mds_grids.size()));
+
         auto interpolation_values = std::vector<value_type>();
         interpolation_values.push_back(mds_grids[(mds_grids.size()-1)/2][idx][]); // TODO: add support for higher order interpolations, i.e. more values here
 
@@ -204,18 +209,18 @@ vlv::VlasovGrid::value_type DenseGrid::CalculateMoment(const tyvi::mdgrid_work& 
     const auto calculate_integral = [grid_mds, exs, deltas, func](const auto idx) {
         const auto f = grid_mds[idx][];
         const auto u = toolbox::Vec3(
-            GetVelFromInd(idx[0], exs[0], deltas[0]),
-            GetVelFromInd(idx[1], exs[1], deltas[1]),
+            0.0f,
+            0.0f,
             GetVelFromInd(idx[2], exs[2], deltas[2])
         );
         const value_type gamma = sstd::sqrt(value_type{1} + toolbox::dot(u,u)); // TODO is it necessary to calculate gamma here?
-        return f * static_cast<value_type>(func(u[0],u[1],u[2],gamma));
+        const auto val = f * static_cast<value_type>(func(u[0],u[1],u[2],gamma));
+        return (idx[0] == 1 && idx[1] == 1) ? val : 0.0f;
     };
     const auto v_iterator_begin =
         thrust::make_transform_iterator(index_space.begin(), calculate_integral);
     const auto v_iterator_end = rn::next(v_iterator_begin, rn::size(index_space));
-    const auto du3 = deltas[0] * deltas[1] * deltas[2];
-    return thrust::reduce(w.on_this(), v_iterator_begin, v_iterator_end) * du3;
+    return thrust::reduce(w.on_this(), v_iterator_begin, v_iterator_end) * deltas[2];
 }
 
 constexpr vlv::VlasovGrid::value_type VlasovGrid::Interpolator(std::vector<value_type> &values, value_type t, runko::index_t order){
@@ -255,6 +260,8 @@ void DenseGrid::InitDelta(std::array<value_type,3> v){
     const auto staging_mds = grid_->staging_mds();
 
     std::array<runko::index_t,3> v_inds = GetIndFromVel(v);
+    v_inds[0] = 1;
+    v_inds[1] = 1;
 
     for (const auto idx : tyvi::sstd::index_space(staging_mds)) {
         // If the index is the one corresponding to the given velocity, we set density to one, otherwise to zero
@@ -279,7 +286,8 @@ void DenseGrid::SetGridData(VlasovGrid::VelocityDistributionFunction distributio
         double x = static_cast<double>(v[0]);
         double y = static_cast<double>(v[1]);
         double z = static_cast<double>(v[2]);
-        staging_mds[idx][] = static_cast<value_type>(distribution(x,y,z));
+        auto val = static_cast<value_type>(distribution(x,y,z));
+        staging_mds[idx][] = (idx[0] == 1 && idx[1] == 1) ? val : 0.0f;
     }
 
     const auto w = tyvi::mdgrid_work{};

@@ -10,13 +10,13 @@ Tile<D, VGrid>::Tile(
     emf::Tile<D>(tile_grid_indices, conf),
     containers_(),
     extents_{
-        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[0]) + 2 * halo_size,
-        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[1]) + 2 * halo_size,
+        1,
+        1,
         static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[2]) + 2 * halo_size
     },
     velocity_extents_{
-        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents")[0]),
-        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents")[1]),
+        3,
+        3,
         static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents")[2])
     }
     {
@@ -107,33 +107,33 @@ void Tile<D, VGrid>::AssertInside(std::array<runko::index_t, 3> idx) const{
 }
 
 template<std::size_t D, VelGridType VGrid>
-void Tile<D, VGrid>::DebugAccelerate(runko::index_t x, runko::index_t y, runko::index_t z, double ax, double ay, double az){
-    auto ax_ = static_cast<value_type>(ax);
-    auto ay_ = static_cast<value_type>(ay);
+void Tile<D, VGrid>::DebugAccelerate([[maybe_unused]] runko::index_t x, [[maybe_unused]] runko::index_t y, runko::index_t z, [[maybe_unused]] double ax, [[maybe_unused]] double ay, double az){
+    // auto ax_ = static_cast<value_type>(ax);
+    // auto ay_ = static_cast<value_type>(ay);
     auto az_ = static_cast<value_type>(az);
     const auto w = tyvi::mdgrid_work{};
 
     for (auto& species : containers_){
         const auto mds = species.mds();
         const auto qpm = static_cast<value_type>(species.charge() / species.mass());
-        auto idx = std::array<runko::index_t,3>{x,y,z};
+        auto idx = std::array<runko::index_t,3>{0,0,z};
         AssertInside(idx); 
-        mds[idx][].Shift(w, qpm*ax_, qpm*ay_, qpm*az_);
+        mds[idx][].Shift(w, 0.0f, 0.0f, qpm*az_);
     }
     w.wait();
 }
 
 template<std::size_t D, VelGridType VGrid>
-void Tile<D, VGrid>::SetVelGrid(runko::index_t x, runko::index_t y, runko::index_t z, VDF distribution, runko::index_t species){
-    auto idx = std::array<runko::index_t,3>{x,y,z};
+void Tile<D, VGrid>::SetVelGrid([[maybe_unused]] runko::index_t x, [[maybe_unused]] runko::index_t y, runko::index_t z, VDF distribution, runko::index_t species){
+    auto idx = std::array<runko::index_t,3>{0,0,z};
     AssertInside(idx); 
     const auto mds = containers_[species].mds();
     mds[idx][].SetGridData(distribution);
 }
 
 template<std::size_t D, VelGridType VGrid>
-VlasovGrid& Tile<D, VGrid>::GetVelGrid(runko::index_t x, runko::index_t y, runko::index_t z, runko::index_t species){
-    auto idx = std::array<runko::index_t,3>{x,y,z};
+VlasovGrid& Tile<D, VGrid>::GetVelGrid([[maybe_unused]] runko::index_t x, [[maybe_unused]] runko::index_t y, runko::index_t z, runko::index_t species){
+    auto idx = std::array<runko::index_t,3>{0,0,z};
     AssertInside(idx); 
     const auto mds = containers_[species].mds();
     return mds[idx][];
@@ -143,8 +143,8 @@ template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::set_vlv(Tile<D,VGrid>::VlasovInitFunc func, runko::index_t species){
     const auto nh_mds = nonhalo_submds(containers_[species].mds());
     for (auto idx : tyvi::sstd::index_space(nh_mds)){
-        const double x = static_cast<double>(idx[0]) + 0.5;
-        const double y = static_cast<double>(idx[1]) + 0.5;
+        const double x = 0.0;
+        const double y = 0.0;
         const double z = static_cast<double>(idx[2]) + 0.5;
         nh_mds[idx][].SetGridData( [=] (double ux, double uy, double uz) { return func(x,y,z,ux,uy,uz); } );
     }
@@ -164,9 +164,7 @@ Tile<D, VGrid>::VlasovSnapshot Tile<D, VGrid>::get_vlasov_snapshot(runko::index_
     static_assert(std::is_convertible_v<VGrid*, DenseGrid*>); // TODO: properly handle other kinds of VlasovGrids
 
     for (auto idx : tyvi::sstd::index_space(nh_mds)){
-        const auto grid = static_cast<vlv::DenseGrid&>(GetVelGrid(
-            static_cast<runko::index_t>(idx[0]) + emf::halo_size,
-            static_cast<runko::index_t>(idx[1]) + emf::halo_size,
+        const auto grid = static_cast<vlv::DenseGrid&>(GetVelGrid(0,0,
             static_cast<runko::index_t>(idx[2]) + emf::halo_size,
             species
         ));
@@ -193,18 +191,18 @@ void Tile<D, VGrid>::Translate(){
     for (auto& species : containers_) {
         const auto mds = species.mds();
         const auto nh_mds = nonhalo_submds(mds);
-        const auto getInds = [=](uint64_t x, uint64_t y, uint64_t z){ // shifting the indices from nh_mds to mds
-            return std::array<uint64_t,3>{ x + halo_size, y + halo_size, z + halo_size };
-        };
-
 
         for (auto idx : tyvi::sstd::index_space(nh_mds)){
             auto neighbors = std::vector<VlasovGrid*>();
-            neighbors.push_back(&mds[getInds(idx[0],idx[1],idx[2]-1)][]); // TODO allow higher order reconstruction / interpolation by adding more neighbors
-            neighbors.push_back(&mds[getInds(idx[0],idx[1],idx[2]+0)][]);
-            neighbors.push_back(&mds[getInds(idx[0],idx[1],idx[2]+1)][]);
+            auto index = idx[2]+halo_size;
+            if (index-1 < 0 || index+1 >= mds.extent(2))
+                throw std::range_error(std::format("Index: {} out of range 1 ... {}! Extents are {},{},{}\n",index,mds.extent(2)-2, nh_mds.extent(0), nh_mds.extent(1), nh_mds.extent(2)));
 
-            mds[getInds(idx[0],idx[1],idx[2])][].TranslateZ(w, neighbors, static_cast<value_type>(this->cfl_));
+            neighbors.push_back(&mds[0,0,idx[2]-1+halo_size][]); 
+            neighbors.push_back(&mds[0,0,idx[2]+0+halo_size][]); 
+            neighbors.push_back(&mds[0,0,idx[2]+1+halo_size][]); 
+
+            mds[0,0,idx[2]+halo_size][].TranslateZ(w, neighbors, static_cast<value_type>(this->cfl_));
         }
     }
     w.wait();
@@ -223,8 +221,8 @@ void Tile<D, VGrid>::CleanUp(){
 }
 
 template<std::size_t D, VelGridType VGrid>
-Tile<D, VGrid>::value_type Tile<D, VGrid>::CalculateMoment(runko::index_t x, runko::index_t y, runko::index_t z, MCF func, runko::index_t species){
-    auto idx = std::array<runko::index_t,3>{x,y,z};
+Tile<D, VGrid>::value_type Tile<D, VGrid>::CalculateMoment([[maybe_unused]] runko::index_t x, [[maybe_unused]] runko::index_t y, runko::index_t z, MCF func, runko::index_t species){
+    auto idx = std::array<runko::index_t,3>{0,0,z};
     AssertInside(idx); 
     const auto mds = containers_[species].mds();
     const auto w = tyvi::mdgrid_work{};
@@ -235,8 +233,8 @@ template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::DebugBC(){
     // TODO: add other axes
     const auto extents = this->yee_lattice_.extents_wout_halo();
-    const auto x_full = std::tuple { 0, 2 * halo_size + extents[0] };
-    const auto y_full = std::tuple { 0, 2 * halo_size + extents[1] };
+    const auto x_full = std::tuple { 0, 1 };
+    const auto y_full = std::tuple { 0, 1 };
     [[maybe_unused]] const auto z_full = std::tuple { 0, 2 * halo_size + extents[2] };
 
     const auto w = tyvi::mdgrid_work{};
@@ -272,11 +270,11 @@ template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::deposit_current(){
     const auto w = tyvi::mdgrid_work{};
     this->yee_lattice_.clear_current();
-    auto J_grid = runko::VecGrid<value_type>(containers_[0].extents());
-    const auto J_smds = nonhalo_submds(J_grid.staging_mds());
+    auto J_grid = runko::VecGrid<value_type>(this->yee_lattice_.extents_with_halo());
+    const auto J_smds = emf_nonhalo_submds(J_grid.staging_mds());
 
-    const auto vx_lambda = [] ([[maybe_unused]] double u_x, [[maybe_unused]] double u_y, [[maybe_unused]] double u_z, double gamma) { return u_x / gamma; };
-    const auto vy_lambda = [] ([[maybe_unused]] double u_x, [[maybe_unused]] double u_y, [[maybe_unused]] double u_z, double gamma) { return u_y / gamma; };
+    // const auto vx_lambda = [] ([[maybe_unused]] double u_x, [[maybe_unused]] double u_y, [[maybe_unused]] double u_z, double gamma) { return u_x / gamma; };
+    // const auto vy_lambda = [] ([[maybe_unused]] double u_x, [[maybe_unused]] double u_y, [[maybe_unused]] double u_z, double gamma) { return u_y / gamma; };
     const auto vz_lambda = [] ([[maybe_unused]] double u_x, [[maybe_unused]] double u_y, [[maybe_unused]] double u_z, double gamma) { return u_z / gamma; };
 
     for (auto& species : containers_){
@@ -284,8 +282,8 @@ void Tile<D, VGrid>::deposit_current(){
         const auto Jmult = static_cast<value_type>(species.charge() * this->cfl_); // What we have to multiply by to get current from v
 
         for (auto idx : tyvi::sstd::index_space(J_smds)){
-            J_smds[idx][0] += nh_mds[idx][].CalculateMoment(w, vx_lambda) * Jmult;
-            J_smds[idx][1] += nh_mds[idx][].CalculateMoment(w, vy_lambda) * Jmult;
+            J_smds[idx][0] = 0.0f;
+            J_smds[idx][1] = 0.0f;
             J_smds[idx][2] += nh_mds[idx][].CalculateMoment(w, vz_lambda) * Jmult;
         }
     }
@@ -296,7 +294,7 @@ void Tile<D, VGrid>::deposit_current(){
 template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::accelerate(){
     auto E_grid = runko::VecGrid<value_type>(containers_[0].extents());
-    const auto E_mds = nonhalo_submds(this->yee_lattice_.mds_E());
+    const auto E_mds = emf_nonhalo_submds(this->yee_lattice_.mds_E());
     const auto E_grid_mds = nonhalo_submds(E_grid.mds());
     const auto w = tyvi::mdgrid_work{};
     w.for_each_index(E_grid_mds, [=] (const auto idx, const auto tidx) {
@@ -308,10 +306,9 @@ void Tile<D, VGrid>::accelerate(){
         const auto nh_mds = nonhalo_submds(species.mds());
         const auto qpm = static_cast<value_type>(species.charge() / species.mass());
         for (auto idx : tyvi::sstd::index_space(nh_mds)){
-            const auto a_x = qpm * E_smds[idx][0];
-            const auto a_y = qpm * E_smds[idx][1];
+
             const auto a_z = qpm * E_smds[idx][2];
-            nh_mds[idx][].Shift(w, a_x, a_y, a_z);
+            nh_mds[idx][].Shift(w, 0.0f, 0.0f, a_z);
         }
     }
     w.wait();

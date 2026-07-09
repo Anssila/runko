@@ -46,10 +46,10 @@ class vlv_tile_accelerate(unittest.TestCase):
         tile = create_tile(config)
 
         def maxwell_distr(vx, vy, vz, v_0):# reference velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
-            return (np.pi*v_0**2)**(-1.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
+            return (np.pi*v_0**2)**(-0.5) * np.exp(-(vz**2)/v_0**2)
 
         v_init = lambda x, y, z : maxwell_distr(x,y,z, v_0)
-        for x_,y_,z_ in itertools.product(range(config.n_cells_per_tile[0]), range(config.n_cells_per_tile[1]), range(config.n_cells_per_tile[2])):
+        for x_,y_,z_ in itertools.product(range(1), range(1), range(config.n_cells_per_tile[2])):
             tile.SetVelDistribution(x_,y_,z_, v_init,0)
         n_lambda = lambda x, y, z, gamma : 1.0
         moment0 = tile.CalculateMoment(1,1,1,n_lambda,0)
@@ -87,9 +87,9 @@ class vlv_tile_accelerate(unittest.TestCase):
         # Test that the formed current is correct
         (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
         for x_,y_,z_ in itertools.product(range(config.n_cells_per_tile[0]), range(config.n_cells_per_tile[1]), range(config.n_cells_per_tile[2])):
-            self.assertAlmostEqual(J0x[x_][y_][z_], config.q0**2/config.m0*config.cfl*E0x[x_][y_][z_],5)
-            self.assertAlmostEqual(J0y[x_][y_][z_], config.q0**2/config.m0*config.cfl*E0y[x_][y_][z_],5)
-            self.assertAlmostEqual(J0z[x_][y_][z_], config.q0**2/config.m0*config.cfl*E0z[x_][y_][z_],5)
+            self.assertAlmostEqual(J0x[x_][y_][z_], 0.0,5)
+            self.assertAlmostEqual(J0y[x_][y_][z_], 0.0,5)
+            self.assertAlmostEqual(J0z[x_][y_][z_], config.q0**2/config.m0*config.cfl*E0z[x_][y_][z_] if x_ == 1 and y_ == 1 else 0.0,5)
 
 if __name__ == "__main__":
     unittest.main()
