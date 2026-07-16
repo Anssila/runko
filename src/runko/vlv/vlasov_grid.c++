@@ -156,7 +156,7 @@ void DenseGrid::TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl){
     w.wait();
 }
 
-void DenseGrid::SendData(const tyvi::mdgrid_work& w, VlasovGrid &dest){
+void DenseGrid::SendData(const tyvi::mdgrid_work& w, VlasovGrid &dest) const {
     try {
         DenseGrid &destination = dynamic_cast<DenseGrid&>(dest);
 

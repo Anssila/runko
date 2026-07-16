@@ -41,6 +41,7 @@ public:
     explicit VlasovContainer(VlasovContainerArgs<VGrid> args);
 
     auto mds() { return grid_.mds(); }
+    auto mds() const { return grid_.mds(); }
     auto extents() const { return grid_.grid_extents(); }
 };
 

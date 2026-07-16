@@ -317,6 +317,206 @@ void Tile<D, VGrid>::accelerate(){
     w.wait();
 }
 
+template<std::size_t D, VelGridType VGrid>
+std::vector<mpi4cpp::mpi::request>
+Tile<D, VGrid>::send_data(
+    mpi4cpp::mpi::communicator& comm,
+    const int dest,
+    const int mode,
+    const int tag)
+{
+
+    // GPU backend requires GPU-aware MPI to pass device pointers directly;
+    // CPU backend uses host memory where standard MPI works.
+    #ifndef TYVI_BACKEND_CPU
+    if(not toolbox::system_supports_gpu_aware_mpi()) {
+        throw std::runtime_error { "GPU backend requires GPU-aware MPI." };
+    }
+    #endif
+
+    using runko::comm_mode;
+
+    // Check which mode we are communicating in; only modes relevant for vlv::Tile are processed here, 
+    // rest are forwarded to emf::Tile
+    switch(static_cast<comm_mode>(mode)) {
+        case comm_mode::vlv_particle: {
+            // Number of spatial cells (VlasovGrids) in a tile, also including halo regions
+            const auto tot_spatial_cells = (extents_[0] + 2 * halo_size) *
+                                           (extents_[1] + 2 * halo_size) *
+                                           (extents_[2] + 2 * halo_size);
+
+            // Helper function to calculate the tag for MPI sends and recvs.
+            // Tag must be unique for each idx in the spatial grid of a tile since the communication
+            // is done one VlasovGrid at a time. Corgi uses tags to differentiate different tiles etc. so we 
+            // must offset the tags by the amount of total spatial cells and different species
+            auto get_vlv_tag = [this, tot_spatial_cells, tag] (std::array<runko::index_t,3> idx, runko::index_t species) -> int {
+                return runko::checked_cast<int>(
+                    static_cast<std::size_t>(tag * this->containers_.size()) * tot_spatial_cells
+                    + tot_spatial_cells * species
+                    + idx[0] * (this->extents_[1] + 2 * halo_size) * (this->extents_[2] + 2 * halo_size)
+                    + idx[1] * (this->extents_[2] + 2 * halo_size)
+                    + idx[2]);
+            };
+
+            auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
+                return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
+                       idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
+                       idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
+            };
+
+            // Create a list of requests since each spatial cell and species will have their own
+            auto requests = std::vector<mpi4cpp::mpi::request> ();
+
+            // Loop through all species
+            for (runko::index_t i = 0; i < containers_.size(); i++){
+                const auto mds = containers_[i].mds();
+
+                // Loop through all spatial cells
+                for (auto idx : tyvi::sstd::index_space(mds)){
+                    const auto indices = std::array<runko::index_t,3>{
+                        static_cast<runko::index_t>(idx[0]),
+                        static_cast<runko::index_t>(idx[1]),
+                        static_cast<runko::index_t>(idx[2])
+                    };
+                    if (!is_inside(indices)) continue;
+                    const auto v_grid_span = mds[idx][].span();
+                    requests.push_back(comm.isend( // Create actual MPI recv
+                        dest,
+                        get_vlv_tag(indices, i),
+                        v_grid_span.data(), 
+                        runko::checked_cast<int>(v_grid_span.size())
+                    ));
+                }
+            }
+
+            return requests;
+        }
+        default: return emf::Tile<D>::send_data(comm, dest, mode, tag); // Forward to emf::Tile
+    }
+}
+
+template<std::size_t D, VelGridType VGrid>
+std::vector<mpi4cpp::mpi::request>
+  Tile<D, VGrid>::recv_data(
+    mpi4cpp::mpi::communicator& comm,
+    const int orig,
+    const int mode,
+    const int tag)
+{
+    // GPU backend requires GPU-aware MPI to pass device pointers directly;
+    // CPU backend uses host memory where standard MPI works.
+    #ifndef TYVI_BACKEND_CPU
+    if(not toolbox::system_supports_gpu_aware_mpi()) {
+        throw std::runtime_error { "GPU backend requires GPU-aware MPI." };
+    }
+    #endif
+
+    using runko::comm_mode;
+
+    // Check which mode we are communicating in; only modes relevant for vlv::Tile are processed here, 
+    // rest are forwarded to emf::Tile
+
+    switch(static_cast<comm_mode>(mode)) {
+        case comm_mode::vlv_particle: {
+            // Number of spatial cells (VlasovGrids) in a tile, also including halo regions
+            const auto tot_spatial_cells = (extents_[0] + 2 * halo_size) *
+                                           (extents_[1] + 2 * halo_size) *
+                                           (extents_[2] + 2 * halo_size);
+
+            // Helper function to calculate the tag for MPI sends and recvs.
+            // Tag must be unique for each idx in the spatial grid of a tile since the communication
+            // is done one VlasovGrid at a time. Corgi uses tags to differentiate different tiles etc. so we 
+            // must offset the tags by the amount of total spatial cells and different species
+            auto get_vlv_tag = [this, tot_spatial_cells, tag] (std::array<runko::index_t,3> idx, runko::index_t species) -> int {
+                return runko::checked_cast<int>(
+                    static_cast<std::size_t>(tag * this->containers_.size()) * tot_spatial_cells
+                    + tot_spatial_cells * species
+                    + idx[0] * (this->extents_[1] + 2 * halo_size) * (this->extents_[2] + 2 * halo_size)
+                    + idx[1] * (this->extents_[2] + 2 * halo_size)
+                    + idx[2]);
+            };
+
+            auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
+                return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
+                       idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
+                       idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
+            };
+
+            // Create a list of requests since each spatial cell and species will have their own
+            auto requests = std::vector<mpi4cpp::mpi::request> ();
+
+            // Loop through all species
+            for (runko::index_t i = 0; i < containers_.size(); i++){
+                const auto mds = containers_[i].mds();
+
+                // Loop through all spatial cells
+                for (auto idx : tyvi::sstd::index_space(mds)){
+                    const auto indices = std::array<runko::index_t,3>{
+                        static_cast<runko::index_t>(idx[0]),
+                        static_cast<runko::index_t>(idx[1]),
+                        static_cast<runko::index_t>(idx[2])
+                    };
+                    if (!is_inside(indices)) continue;
+                    const auto v_grid_span = mds[idx][].span();
+                    requests.push_back(comm.irecv( // Create actual MPI recv
+                        orig,
+                        get_vlv_tag(indices, i),
+                        v_grid_span.data(), 
+                        runko::checked_cast<int>(v_grid_span.size())
+                    ));
+                }
+            }
+
+            return requests;
+        }
+        default: return emf::Tile<D>::recv_data(comm, orig, mode, tag); // Forward to emf::Tile
+    }
+}
+
+template<std::size_t D, VelGridType VGrid>
+void Tile<D, VGrid>::local_communication(
+    const corgi::Tile<D>& other_base,
+    const std::array<int, D> dir_to_other,
+    const int mode)
+{
+    auto const* const other_base_ptr = &other_base;
+    using runko::comm_mode;
+    if(static_cast<comm_mode>(mode) != comm_mode::vlv_particle) {
+        emf::Tile<D>::local_communication(other_base, dir_to_other, mode);
+        return;
+    }
+
+    // const auto dir          = runko::grid_neighbor<3>(dir_to_other);
+    // const auto inverted_dir = dir.inverted();
+
+    if(const auto* nonvirtual_other = dynamic_cast<const Tile<D, VGrid>*>(other_base_ptr)) {
+        switch(static_cast<comm_mode>(mode)) {
+            case comm_mode::vlv_particle: {
+                const auto w = tyvi::mdgrid_work{};
+                for (runko::index_t i = 0; i < containers_.size(); i++){
+                    auto       recv_mds =             this->yee_lattice_.subregion              (dir_to_other,                   containers_[i].mds());
+                    const auto send_mds = nonvirtual_other->yee_lattice_.corresponding_subregion(dir_to_other, nonvirtual_other->containers_[i].mds());
+                    for (auto idx : tyvi::sstd::index_space(recv_mds)){
+                        send_mds[idx][].SendData(w, recv_mds[idx][]);
+                    }
+                }
+                w.wait();
+                break;
+            }
+            default:
+                throw std::logic_error { std::format(
+                "vlv::Tile::local_communication does not support given "
+                "communication mode: {}",
+                mode) };
+        }
+    } else {
+        throw std::runtime_error {
+        "vlv::Tile::local_communication assumes that the other tile is "
+        "vlv::Tile."
+        };
+    }
+}
+
 } // namespace vlv
 
 template class vlv::Tile<3, vlv::DenseGrid>;
