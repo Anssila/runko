@@ -1,5 +1,5 @@
 #include "tile.h"
-
+#include <fstream>
 namespace vlv {
 
 template<std::size_t D, VelGridType VGrid>
@@ -18,6 +18,11 @@ Tile<D, VGrid>::Tile(
         static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents")[0]),
         static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents")[1]),
         static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("v_grid_extents")[2])
+    },
+    spatial_offset_{
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[0] * tile_grid_indices[0]),
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[1] * tile_grid_indices[1]),
+        static_cast<runko::index_t>(conf.get_or_throw<std::vector<std::ptrdiff_t>>("n_cells_per_tile")[2] * tile_grid_indices[2])
     }
     {
 
@@ -143,9 +148,9 @@ template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::set_vlv(Tile<D,VGrid>::VlasovInitFunc func, runko::index_t species){
     const auto nh_mds = nonhalo_submds(containers_[species].mds());
     for (auto idx : tyvi::sstd::index_space(nh_mds)){
-        const double x = static_cast<double>(idx[0]) + 0.5;
-        const double y = static_cast<double>(idx[1]) + 0.5;
-        const double z = static_cast<double>(idx[2]) + 0.5;
+        const double x = static_cast<double>(idx[0] + spatial_offset_[0]) + 0.5;
+        const double y = static_cast<double>(idx[1] + spatial_offset_[1]) + 0.5;
+        const double z = static_cast<double>(idx[2] + spatial_offset_[2]) + 0.5;
         nh_mds[idx][].SetGridData( [=] (double ux, double uy, double uz) { return func(x,y,z,ux,uy,uz); } );
     }
 }
@@ -184,6 +189,28 @@ Tile<D, VGrid>::VlasovSnapshot Tile<D, VGrid>::get_vlasov_snapshot(runko::index_
 }
 
 template<std::size_t D, VelGridType VGrid>
+void Tile<D, VGrid>::write_vlv_snapshot() {
+    auto filename = std::format("vlv_snapshot({},{},{}).bin", this->index[0], this->index[1], this->index[2]);
+    std::ofstream stream(filename, std::ios::binary);
+    auto containers = containers_.size();
+    stream.write(reinterpret_cast<const char *>(&containers), sizeof(containers));
+    for (runko::index_t i = 0; i < containers_.size(); i++){
+        auto mds = containers_[i].mds();
+        auto size = mds.size();
+        auto exs = std::array<std::size_t,3>{mds.extent(0),mds.extent(1),mds.extent(2)};
+        stream.write(reinterpret_cast<const char *>(&size), sizeof(size));
+        stream.write(reinterpret_cast<const char *>(&exs[0]), sizeof(exs[0])*3);
+        for (auto idx : tyvi::sstd::index_space(mds)){
+            const auto w = tyvi::mdgrid_work{};
+            value_type tot_fluid = mds[idx][].CalculateMoment(w, [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma) {return 1.0;});
+            stream.write(reinterpret_cast<const char *>(&tot_fluid), sizeof(value_type));
+        }
+    }
+    stream.close();
+
+}
+
+template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::Translate(){ 
 
     // TODO: other axes and strang-splitting
@@ -192,13 +219,20 @@ void Tile<D, VGrid>::Translate(){
 
     for (auto& species : containers_) {
         const auto mds = species.mds();
-        const auto nh_mds = nonhalo_submds(mds);
+        const auto x = std::tuple { halo_size    , extents_[0] - halo_size     };
+        const auto y = std::tuple { halo_size    , extents_[1] - halo_size     };
+        const auto z = std::tuple { halo_size - 1, extents_[2] - halo_size + 1 }; 
+        // ^ We must update also the innermost cells in the halo region in the z-direction because we have a fwd semi lagrangian scheme
+        // only the innermost are enough because fluid mustn't move more than a single cell in a single time step
+
+        const auto update_mds = std::submdspan(std::forward<decltype(mds)>(mds), x, y, z);
+
         const auto getInds = [=](uint64_t x, uint64_t y, uint64_t z){ // shifting the indices from nh_mds to mds
-            return std::array<uint64_t,3>{ x + halo_size, y + halo_size, z + halo_size };
+            return std::array<uint64_t,3>{ x + halo_size, y + halo_size, z + halo_size - 1 };
         };
 
 
-        for (auto idx : tyvi::sstd::index_space(nh_mds)){
+        for (auto idx : tyvi::sstd::index_space(update_mds)){
             auto neighbors = std::vector<VlasovGrid*>();
             neighbors.push_back(&mds[getInds(idx[0],idx[1],idx[2]-1)][]); // TODO allow higher order reconstruction / interpolation by adding more neighbors
             neighbors.push_back(&mds[getInds(idx[0],idx[1],idx[2]+0)][]);
@@ -486,20 +520,28 @@ void Tile<D, VGrid>::local_communication(
         return;
     }
 
-    // const auto dir          = runko::grid_neighbor<3>(dir_to_other);
-    // const auto inverted_dir = dir.inverted();
+    // const auto inverted_dir = std::array<int,3>{-dir_to_other[0],-dir_to_other[1],-dir_to_other[2]};
 
-    if(const auto* nonvirtual_other = dynamic_cast<const Tile<D, VGrid>*>(other_base_ptr)) {
+    if(const auto* other = dynamic_cast<const Tile<D, VGrid>*>(other_base_ptr)) {
         switch(static_cast<comm_mode>(mode)) {
             case comm_mode::vlv_particle: {
+                // std::cout << "Communicating to {" << this->index[0] << "," << this->index[1] << "," << this->index[2] << "} from dir {"  << dir_to_other[0] << "," << dir_to_other[1] << "," << dir_to_other[2] << "}.\n";
                 const auto w = tyvi::mdgrid_work{};
+                // auto updates = std::vector<std::array<std::size_t, 3>>();
                 for (runko::index_t i = 0; i < containers_.size(); i++){
-                    auto       recv_mds =             this->yee_lattice_.subregion              (dir_to_other,                   containers_[i].mds());
-                    const auto send_mds = nonvirtual_other->yee_lattice_.corresponding_subregion(dir_to_other, nonvirtual_other->containers_[i].mds());
+                    auto       recv_mds =  this->yee_lattice_.subregion              (dir_to_other,        containers_[i].mds());
+                    const auto send_mds = other->yee_lattice_.corresponding_subregion(dir_to_other, other->containers_[i].mds());
                     for (auto idx : tyvi::sstd::index_space(recv_mds)){
-                        send_mds[idx][].SendData(w, recv_mds[idx][]);
+                        recv_mds[idx][].recv_data(w, send_mds[idx][]);
+                        // updates.push_back(idx);
                     }
                 }
+                // std::stringstream msg;
+                // msg << "Visited positions: \n";
+                // for (auto pos : updates){
+                //     msg << "{" <<pos[0] << ", " << pos[1] << ", " << pos[2] << "}\t";
+                // }
+                // if (dir_to_other[0] == 1 && dir_to_other[1] == 0 && dir_to_other[2] == 0) throw std::runtime_error(msg.str());
                 w.wait();
                 break;
             }

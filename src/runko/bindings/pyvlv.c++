@@ -105,6 +105,7 @@ void bind_vlv(  py::module& m_sub){
     .def("get_vlv_snapshot", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int species) {
       return to_6darray(tile.get_vlasov_snapshot(species));
     })
+    .def("write_vlv_snapshot", &vlv::Tile<3, vlv::DenseGrid>::write_vlv_snapshot)
     .def("get_tot_energy_E", &vlv::Tile<3, vlv::DenseGrid>::get_tot_energy_E)
     .def_static("canonical_type", []() { return py::type::of<vlv::Tile<3, DenseGrid>>(); });
 

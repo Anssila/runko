@@ -9,14 +9,14 @@ def maxwell_distr(vx, vy, vz, v_0):# reference velocity = sqrt((2*k*T)/m) (m is 
 
 if __name__ == "__main__":
     config = runko.Configuration(None)
-
+    config.io_outdir = "comm-test"
     config.tile_partitioning = "hilbert_curve"
-    config.n_laps = 100
-    config.n_tiles = [1, 1, 1]
-    config.n_cells_per_tile = [5, 5, 20]
+    config.n_laps = 200
+    config.n_tiles = [1, 1, 4]
+    config.n_cells_per_tile = [3, 3, 20]
     config.v_grid_extents = [3,3,20]
     config.u_max = [2.0,2.0,2.0]
-    config.cfl = 0.5
+    config.cfl = 0.45
     config.field_propagator = "fdtd2"
     config.q0 = 1.0
     config.m0 = 1.0
@@ -24,43 +24,62 @@ if __name__ == "__main__":
 
     tile_grid = runko.TileGrid(config)
 
-    # Initial conditions:
+    logger = runko.runko_logger()
 
-    k = 2 * np.pi * np.array((0, 0, 1)) / 10.
+    noise_A = 1e-3
+    noise_f = 0.25
 
-    def E0(x, y, z):
-        r = np.array((x, y, z))
-        return np.sin(np.dot(k, r)), 0, 0
-
-    B0 = lambda x, y, z: (0, 0, 0)
+    E0 = lambda x, y, z: (0, 0, np.sin(noise_f*z)*noise_A)
+    B0 = lambda x, y, z: (0, np.cos(noise_f*z)*noise_A, 0)
     J0 = lambda x, y, z: (0, 0, 0)
 
     def vlv0(x,y,z,ux,uy,uz):
-        if x != 3 or y != 3 or ux != 0.0 or uy != 0.0:
+        if abs(ux) > 0.1 or abs(uy) > 0.1:
             return 0.0
-        global v_0
-        return (np.pi*v_0**2)**(-0.5) * (np.exp(-(uz-10.0*v_0)**2/v_0**2) + np.exp(-(uz+10.0*v_0)**2/v_0**2))
+        return max(0,5.0-abs(z-30.0)-10.0*abs(uz-1.0))
 
     for idx in tile_grid.local_tile_indices():
         tile = runko.vlv.threeD.Tile(idx, config)
         tile.set_EBJ(E0, B0, J0)
-        tile.set_vlv()
+        tile.set_vlv(vlv0, 0)
         tile_grid.add_tile(tile, idx)
 
     # Simulation config:
     simulation = tile_grid.configure_simulation(config)
 
+    def sync_E(x):
+        x.comm_external(runko.tools.comm_mode.emf_E)
+        x.comm_local(runko.tools.comm_mode.emf_E)
+
+    simulation.prelude(sync_E)
+
     def lap_function(x):
-        x.grid_Translate()
-        x.grid_DebugBC()
-        x.grid_CleanUp()
-        x.grid_accelerate()
-        x.grid_deposit_current()
-        x.grid_add_current()
-        if simulation.lap % 5 == 0:
+        if simulation.lap % 40 == 0:
             x.io_emf_snapshot()
 
-        if simulation.lap % 5 == 0:
+        x.comm_external(runko.tools.comm_mode.vlv_particle)
+        x.comm_local(runko.tools.comm_mode.vlv_particle)
+
+        x.grid_Translate()
+        # x.grid_DebugBC()
+        x.grid_CleanUp()
+
+        if simulation.lap == 100:
+            x.grid_write_vlv_snapshot()
+
+        # x.grid_accelerate()
+        x.grid_deposit_current()
+        x.grid_add_current()
+        EBmodes = (runko.tools.comm_mode.emf_E, runko.tools.comm_mode.emf_B)
+
+        x.comm_external(*EBmodes)
+        x.comm_local(*EBmodes)
+        x.grid_push_e()
+
+        x.grid_push_half_b()
+
+        if simulation.lap % 10 == 0:
             simulation.log_timer_statistics()
 
     simulation.for_each_lap(lap_function)
+    simulation.log_timer_statistics()

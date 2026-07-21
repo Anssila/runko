@@ -44,6 +44,7 @@ protected:
     static_cast<runko::index_t>(emf::halo_size);
   const std::array<runko::index_t, 3> extents_;
   const std::array<runko::index_t, 3> velocity_extents_;
+  const std::array<runko::index_t, 3> spatial_offset_;
 
   // function for getting the sub mdspan not containing the halo regions
   template<typename MDS>
@@ -100,6 +101,9 @@ public:
                               // for the species given
   VlasovSnapshot get_vlasov_snapshot(
     runko::index_t species);  // Get the data in this Tile in a 1d1v simulation
+
+  void write_vlv_snapshot();
+
   double get_tot_energy_E() { return this->total_energy_E(); }
 
   void local_communication(
