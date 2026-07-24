@@ -42,7 +42,8 @@ public:
     virtual void TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl) = 0; // A non-async overload of Translate
     virtual void Clean(const tyvi::mdgrid_work& w) = 0; // Clean the old buffer and swap
     virtual void Clean() = 0; // A non-async overload of Clean
-    virtual void SendData(const tyvi::mdgrid_work& w, VlasovGrid &dest) = 0; // Send the data of this (virtual) VlasovGrid to another VlasovGrid such that it is superimposed on the data of the destination grid (the values are summed into the new grid)
+    virtual void SendData(const tyvi::mdgrid_work& w, VlasovGrid &dest) const = 0; // Send the data of this (virtual) VlasovGrid to another VlasovGrid such that it is superimposed on the data of the destination grid (the values are summed into the new grid)
+    virtual void recv_data(const tyvi::mdgrid_work& w, const VlasovGrid &orig) = 0; // Receive the data of a neighboring VlasovGrid and update this VlasovGrids data to mach that
 
     virtual value_type CalculateMoment(const tyvi::mdgrid_work& w, MomentCalculationFunction func) = 0; // Generalized function for calculating moments of the distribution velocity distribution.
 
@@ -83,7 +84,8 @@ public:
     void TranslateZ(std::vector<VlasovGrid*> neighbors, value_type cfl) override;
     void Clean(const tyvi::mdgrid_work& w) override;
     void Clean() override;
-    void SendData(const tyvi::mdgrid_work& w, VlasovGrid &test) override;
+    void SendData(const tyvi::mdgrid_work& w, VlasovGrid &test) const override;
+    void recv_data(const tyvi::mdgrid_work& w, const VlasovGrid &test) override;
 
     value_type CalculateMoment(const tyvi::mdgrid_work& w, MomentCalculationFunction func) override;
 
@@ -98,6 +100,7 @@ public:
         return grid_->staging_mds(); 
     }
     auto GetMDS() const { return grid_->mds(); }
+    auto span() const { return grid_->span(); }
     auto GetExtents() const { return extents_; }
 
 private:

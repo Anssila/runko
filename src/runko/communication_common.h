@@ -34,7 +34,8 @@ enum class comm_mode : int {
   pic_particle       = 3,
   pic_particle_extra = 4,
   number_of_particles,
-  emf_J_exchange
+  emf_J_exchange,
+  vlv_particle
 };
 
 
