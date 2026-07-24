@@ -160,13 +160,11 @@ void DenseGrid::SendData(const tyvi::mdgrid_work& w, VlasovGrid &dest) const {
     try {
         DenseGrid &destination = dynamic_cast<DenseGrid&>(dest);
 
-        // const auto w = tyvi::mdgrid_work{};
-
         auto kernel = [source_mds = new_grid_->mds(), dest_mds = destination.new_grid_->mds()] (const auto &idx) {
             dest_mds[idx][] += source_mds[idx][];
         };
 
-        w.for_each_index(*grid_, std::move(kernel)); // .wait()
+        w.for_each_index(*grid_, std::move(kernel));
 
     } catch (const std::bad_cast& e) {
         throw std::runtime_error("Cannot send data to a VlasovGrid of a different type!\n");
@@ -177,13 +175,11 @@ void DenseGrid::recv_data(const tyvi::mdgrid_work& w, const VlasovGrid &orig) {
     try {
         const DenseGrid &origin = dynamic_cast<const DenseGrid&>(orig);
 
-        // const auto w = tyvi::mdgrid_work{};
-
         auto kernel = [dest_mds = grid_->mds(), source_mds = origin.grid_->mds()] (const auto &idx) {
             dest_mds[idx][] = source_mds[idx][];
         };
 
-        w.for_each_index(*grid_, std::move(kernel)); // .wait()
+        w.for_each_index(*grid_, std::move(kernel));
 
     } catch (const std::bad_cast& e) {
         throw std::runtime_error("Cannot send data to a VlasovGrid of a different type!\n");

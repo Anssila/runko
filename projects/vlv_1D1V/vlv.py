@@ -12,8 +12,8 @@ if __name__ == "__main__":
     config.io_outdir = "comm-test"
     config.tile_partitioning = "hilbert_curve"
     config.n_laps = 200
-    config.n_tiles = [1, 1, 4]
-    config.n_cells_per_tile = [3, 3, 20]
+    config.n_tiles = [1, 1, 1]
+    config.n_cells_per_tile = [3, 3, 80]
     config.v_grid_extents = [3,3,20]
     config.u_max = [2.0,2.0,2.0]
     config.cfl = 0.45
@@ -57,26 +57,24 @@ if __name__ == "__main__":
         if simulation.lap % 40 == 0:
             x.io_emf_snapshot()
 
+        x.grid_accelerate()
+        x.grid_deposit_current()
+
         x.comm_external(runko.tools.comm_mode.vlv_particle)
         x.comm_local(runko.tools.comm_mode.vlv_particle)
 
         x.grid_Translate()
-        # x.grid_DebugBC()
         x.grid_CleanUp()
 
         if simulation.lap == 100:
             x.grid_write_vlv_snapshot()
 
-        # x.grid_accelerate()
-        x.grid_deposit_current()
         x.grid_add_current()
-        EBmodes = (runko.tools.comm_mode.emf_E, runko.tools.comm_mode.emf_B)
 
-        x.comm_external(*EBmodes)
-        x.comm_local(*EBmodes)
-        x.grid_push_e()
+        x.comm_external(runko.tools.comm_mode.emf_E)
+        x.comm_local(runko.tools.comm_mode.emf_E)
+        # x.grid_push_e()
 
-        x.grid_push_half_b()
 
         if simulation.lap % 10 == 0:
             simulation.log_timer_statistics()

@@ -515,33 +515,29 @@ void Tile<D, VGrid>::local_communication(
 {
     auto const* const other_base_ptr = &other_base;
     using runko::comm_mode;
+
+    // First check if the communication is not something that needs vlv::Tile
     if(static_cast<comm_mode>(mode) != comm_mode::vlv_particle) {
+        // If not, do the communication using emf::Tile
         emf::Tile<D>::local_communication(other_base, dir_to_other, mode);
         return;
     }
 
-    // const auto inverted_dir = std::array<int,3>{-dir_to_other[0],-dir_to_other[1],-dir_to_other[2]};
-
+    // Cast to correct type of Tile, throw if it fails
     if(const auto* other = dynamic_cast<const Tile<D, VGrid>*>(other_base_ptr)) {
-        switch(static_cast<comm_mode>(mode)) {
+        switch(static_cast<comm_mode>(mode)) { // Go through the relevant comm_modes (unnecessary for only one)
             case comm_mode::vlv_particle: {
-                // std::cout << "Communicating to {" << this->index[0] << "," << this->index[1] << "," << this->index[2] << "} from dir {"  << dir_to_other[0] << "," << dir_to_other[1] << "," << dir_to_other[2] << "}.\n";
                 const auto w = tyvi::mdgrid_work{};
-                // auto updates = std::vector<std::array<std::size_t, 3>>();
+
+                // Update all VlasovMeshes in the subregion (on this Tile's halo region) from the corresponding
+                // subregion on the other Tile (not on halo region).
                 for (runko::index_t i = 0; i < containers_.size(); i++){
                     auto       recv_mds =  this->yee_lattice_.subregion              (dir_to_other,        containers_[i].mds());
                     const auto send_mds = other->yee_lattice_.corresponding_subregion(dir_to_other, other->containers_[i].mds());
                     for (auto idx : tyvi::sstd::index_space(recv_mds)){
                         recv_mds[idx][].recv_data(w, send_mds[idx][]);
-                        // updates.push_back(idx);
                     }
                 }
-                // std::stringstream msg;
-                // msg << "Visited positions: \n";
-                // for (auto pos : updates){
-                //     msg << "{" <<pos[0] << ", " << pos[1] << ", " << pos[2] << "}\t";
-                // }
-                // if (dir_to_other[0] == 1 && dir_to_other[1] == 0 && dir_to_other[2] == 0) throw std::runtime_error(msg.str());
                 w.wait();
                 break;
             }
