@@ -29,10 +29,8 @@ if __name__ == "__main__":
     config.u_max = [0.01,0.01,0.01]
     config.cfl = 100.0
     config.field_propagator = "fdtd2"
-    config.q0 = 0.005
-    config.q1 = 0.005
+    config.q0 = 0.01
     config.m0 = 1.0
-    config.m1 = 1.0
     v_T = config.u_max[2]/200.0
     v_0 = 50.0 * v_T
 
@@ -47,7 +45,7 @@ if __name__ == "__main__":
         # if abs(x-0.5) > 0.01 or abs(y-0.5) > 0.01 or abs(ux) > 1e-6 or abs(uy) > 1e-6:
         #     return 0
         global v_T, v_0
-        return (np.pi*v_T**2)**(-0.5) * (np.exp(-(uz-v_0)**2/v_T**2) ) * (1+np.cos(noise_f*z)*noise_A)
+        return (np.pi*v_T**2)**(-0.5) * (np.exp(-(uz-v_0)**2/v_T**2) + np.exp(-(uz+v_0)**2/v_T**2)) * (1+np.cos(noise_f*z)*noise_A)
 
     def vlv1(x,y,z,ux,uy,uz):
         # if abs(x-1.5) > 0.01 or abs(y-1.5) > 0.01 or abs(ux) > 1e-6 or abs(uy) > 1e-6:
@@ -58,8 +56,8 @@ if __name__ == "__main__":
     tile = runko.vlv.threeD.Tile((0,0,0), config)
     tile.set_EBJ(E0, B0, J0)
     tile.set_vlv(vlv0, 0)
-    tile.set_vlv(vlv1, 1)
-
+    tile.DebugBC()
+ 
     # average number density of plasma in the simulation
     avg_n = sum([tile.CalculateMoment(0,0,i, lambda x, y, z, gamma : 1.0, 0) for i in range(spatial_ex)])/spatial_ex # TODO: use both or just one species here?
 
@@ -74,7 +72,6 @@ if __name__ == "__main__":
     print(f"Wave length of maximum growing mode: {1/k_m}")
 
     data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
-    data1 = np.rot90(tile.get_vlv_snapshot(1)[0,0,:,1,1,:])
     (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
     e_data = E0z[1][1]
     j_data = J0z[1][1]
@@ -82,7 +79,7 @@ if __name__ == "__main__":
     # print(data)
     fig, axs = plt.subplots(1,2)
     im = []
-    im.append(axs[0].imshow(data0 + data1, norm=LogNorm(vmin=1e-8, vmax=(np.pi*v_T**2)**(-0.5)), extent=[-spatial_ex//2,spatial_ex//2,-config.u_max[2],config.u_max[2]]))
+    im.append(axs[0].imshow(data0, norm=LogNorm(vmin=1e-8, vmax=(np.pi*v_T**2)**(-0.5)), extent=[-spatial_ex//2,spatial_ex//2,-config.u_max[2],config.u_max[2]]))
     cbar = fig.colorbar(im[0], ax=axs[0], label="Lukumäärätiheys")
     im.append(axs[1].plot(range(-spatial_ex//2,spatial_ex//2),e_data,label="Ez")[0])
     im.append(axs[1].plot(range(-spatial_ex//2,spatial_ex//2),j_data,label="Jz")[0])
@@ -104,10 +101,9 @@ if __name__ == "__main__":
         if frame == 0:
             tile.set_EBJ(E0, B0, J0)
             tile.set_vlv(vlv0, 0)
-            tile.set_vlv(vlv1, 1)
+            tile.DebugBC()
             data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
-            data1 = np.rot90(tile.get_vlv_snapshot(1)[0,0,:,1,1,:])
-            im[0].set_array(data0 + data1)
+            im[0].set_array(data0)
             (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
             e_data = E0z[1][1]
             j_data = J0z[1][1]
@@ -119,15 +115,15 @@ if __name__ == "__main__":
             analytic_y = [energy_0]
             return im
         for i in range(extra_loops):
-            tile.Translate()
-            tile.DebugBC()
-            tile.CleanUp()
             tile.accelerate()
             tile.deposit_current()
             tile.add_current()
+            tile.Translate()
+            tile.CleanUp()
+            tile.DebugBC()
+
         data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
-        data1 = np.rot90(tile.get_vlv_snapshot(1)[0,0,:,1,1,:])
-        im[0].set_array(data0 + data1)
+        im[0].set_array(data0)
         (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
         e_data = E0z[1][1]
         j_data = J0z[1][1]

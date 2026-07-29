@@ -41,32 +41,52 @@ def plot(data, fig, ax, vmin=None, vmax=None, cblabel=""):
                  orientation=None,
                  label=cblabel)
 
+def plot_energy(datas, fig, ax, names):
+    i = 0
+    for data in datas:
+        x_data, y_data = zip(*data)
+        ax.semilogy(x_data, y_data, label=names[i])
+        i += 1
+    ax.set_title("Sähkökentän keskimääräinen energiatiheys aika-askeleen funktiona")
+    ax.set_xlabel("Aika-askel")
+    ax.set_ylabel("Sähkökentän energia $\\langle \\hat{E}^2 \\rangle / 8\\pi$")
+
 if __name__ == "__main__":
 
     var = sys.argv[1]
-    filenames = sys.argv[2:] 
-    filenames.sort(key = lambda name : int(name[name.find("flds")+5:-4]))
-    rows = len(filenames)
-    fig, ax_all = plt.subplots(rows, 1,
-                               layout="compressed",
-                               figsize=(10, rows))
+    if var == "e2":
+        filenames = sys.argv[2:]
+        fig, ax = plt.subplots()
+        datas = []
+        for filename in filenames:
+            datas.append(np.loadtxt(filename))
+        plot_energy(datas, fig, ax, [name[name.find("average_E_energy_density"):-4] for name in filenames])
+        plt.legend()
+        plt.show()
+    else:
+        filenames = sys.argv[2:] 
+        filenames.sort(key = lambda name : int(name[name.find("flds")+5:-4]))
+        rows = len(filenames)
+        fig, ax_all = plt.subplots(rows, 1,
+                                layout="compressed",
+                                figsize=(10, rows))
 
-    if rows == 1:
-        ax_all = [ax_all]
+        if rows == 1:
+            ax_all = [ax_all]
 
-    for i, file in enumerate(filenames):
-        ax = ax_all[i]
+        for i, file in enumerate(filenames):
+            ax = ax_all[i]
 
-        match var:
-            case "je":
-                plot(read_je(file), fig, ax, cblabel=file)
-            case "bz":
-                plot(read_full_box(file, "bz"), fig, ax, cblabel=file)
-            case "ez":
-                plot(read_full_box(file, "ez"), fig, ax, cblabel=file)
-            case "jz":
-                plot(read_full_box(file, "jz"), fig, ax, cblabel=file)
+            match var:
+                case "je":
+                    plot(read_je(file), fig, ax, cblabel=file)
+                case "bz":
+                    plot(read_full_box(file, "bz"), fig, ax, cblabel=file)
+                case "ez":
+                    plot(read_full_box(file, "ez"), fig, ax, cblabel=file)
+                case "jz":
+                    plot(read_full_box(file, "jz"), fig, ax, cblabel=file)
 
 
-    fig.suptitle(var)
-    plt.show()
+        fig.suptitle(var)
+        plt.show()

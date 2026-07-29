@@ -231,9 +231,9 @@ void Tile<D, VGrid>::Translate(){
             if (index-1 < 0 || index+1 >= mds.extent(2))
                 throw std::range_error(std::format("Index: {} out of range 1 ... {}! Extents are {},{},{}\n",index,mds.extent(2)-2, update_mds.extent(0), update_mds.extent(1), update_mds.extent(2)));
 
-            neighbors.push_back(&mds[0,0,idx[2]-1+halo_size][]); 
-            neighbors.push_back(&mds[0,0,idx[2]+0+halo_size][]); 
-            neighbors.push_back(&mds[0,0,idx[2]+1+halo_size][]); 
+            neighbors.push_back(&mds[0,0,idx[2]-1+halo_size-1][]); 
+            neighbors.push_back(&mds[0,0,idx[2]+0+halo_size-1][]); 
+            neighbors.push_back(&mds[0,0,idx[2]+1+halo_size-1][]); 
 
             mds[0,0,idx[2]+halo_size][].TranslateZ(w, neighbors, static_cast<value_type>(this->cfl_));
         }
@@ -283,12 +283,12 @@ void Tile<D, VGrid>::DebugBC(){
         const auto z_right_dest = std::submdspan( std::forward<decltype(species.mds())>(species.mds()), x_full, y_full, std::tuple { halo_size , 2 * halo_size } );
 
 
-        for (auto idx : tyvi::sstd::index_space(z_left_halo)){
-            z_left_halo[idx][].SendData(w,z_left_dest[idx][]);
+        for (auto idx : tyvi::sstd::index_space(z_left_dest)){
+            z_left_halo[idx][].recv_data(w,z_left_dest[idx][]);
         }
 
-        for (auto idx : tyvi::sstd::index_space(z_right_halo)){
-            z_right_halo[idx][].SendData(w,z_right_dest[idx][]);
+        for (auto idx : tyvi::sstd::index_space(z_right_dest)){
+            z_right_halo[idx][].recv_data(w,z_right_dest[idx][]);
         }
     }
 
@@ -519,6 +519,30 @@ void Tile<D, VGrid>::local_communication(
         return;
     }
 
+    auto oneD_dir_to_index_extent =
+        [&, this](const int i) -> std::tuple<std::size_t, std::size_t> {
+        switch(i) {
+            case -1: return { 0uz, halo_size };
+            case 0: return { halo_size, extents_[2] - halo_size };
+            case 1:
+                return { extents_[2] - halo_size,
+                        extents_[2] };
+            default:
+                throw std::logic_error { std::format("dir[2] = {} != -1, 0 or 1", i) };
+        }
+    };
+
+    auto oneD_dir_to_corresponding_index_extent =
+        [&, this](const int i) -> std::tuple<std::size_t, std::size_t> {
+        switch(-i) {
+            case -1: return { halo_size, 2u * halo_size };
+            case 0: return { halo_size, extents_[2] - halo_size };
+            case 1: return { extents_[2] - 2uz * halo_size, extents_[2] - halo_size };
+            default:
+                throw std::logic_error { std::format("dir[2] = {} != -1, 0 or 1", i) };
+        }
+    };
+
     // Cast to correct type of Tile, throw if it fails
     if(const auto* other = dynamic_cast<const Tile<D, VGrid>*>(other_base_ptr)) {
         switch(static_cast<comm_mode>(mode)) { // Go through the relevant comm_modes (unnecessary for only one)
@@ -528,8 +552,8 @@ void Tile<D, VGrid>::local_communication(
                 // Update all VlasovMeshes in the subregion (on this Tile's halo region) from the corresponding
                 // subregion on the other Tile (not on halo region).
                 for (runko::index_t i = 0; i < containers_.size(); i++){
-                    auto       recv_mds =  this->yee_lattice_.subregion              (dir_to_other,        containers_[i].mds());
-                    const auto send_mds = other->yee_lattice_.corresponding_subregion(dir_to_other, other->containers_[i].mds());
+                    auto       recv_mds = std::submdspan(       containers_[i].mds(), std::tuple{0,1}, std::tuple{0,1}, oneD_dir_to_index_extent(dir_to_other[2]));
+                    const auto send_mds = std::submdspan(other->containers_[i].mds(), std::tuple{0,1}, std::tuple{0,1}, oneD_dir_to_corresponding_index_extent(dir_to_other[2]));
                     for (auto idx : tyvi::sstd::index_space(recv_mds)){
                         recv_mds[idx][].recv_data(w, send_mds[idx][]);
                     }

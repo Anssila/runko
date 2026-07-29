@@ -9,34 +9,36 @@ def maxwell_distr(vx, vy, vz, v_0):# reference velocity = sqrt((2*k*T)/m) (m is 
 
 if __name__ == "__main__":
     config = runko.Configuration(None)
-    config.io_outdir = "comm-test"
+    config.io_outdir = "two-stream"
     config.tile_partitioning = "hilbert_curve"
-    config.n_laps = 200
+    config.n_laps = 2000
     config.n_tiles = [1, 1, 1]
     config.n_cells_per_tile = [3, 3, 80]
-    config.v_grid_extents = [3,3,20]
-    config.u_max = [2.0,2.0,2.0]
-    config.cfl = 0.45
+    config.v_grid_extents = [3,3,80]
+    config.u_max = [0.01,0.01,0.01]
+    config.cfl = 100.0
     config.field_propagator = "fdtd2"
-    config.q0 = 1.0
+    config.q0 = 0.005
     config.m0 = 1.0
-    v_0 = config.u_max[2]/20.0
+    v_T = config.u_max[2]/200.0
+    v_0 = 50.0 * v_T
 
     tile_grid = runko.TileGrid(config)
 
     logger = runko.runko_logger()
 
-    noise_A = 1e-3
-    noise_f = 0.25
+    noise_A = 1e-7
+    noise_f = 4*np.pi/50
 
     E0 = lambda x, y, z: (0, 0, np.sin(noise_f*z)*noise_A)
-    B0 = lambda x, y, z: (0, np.cos(noise_f*z)*noise_A, 0)
+    B0 = lambda x, y, z: (0, 0, 0)
     J0 = lambda x, y, z: (0, 0, 0)
 
     def vlv0(x,y,z,ux,uy,uz):
-        if abs(ux) > 0.1 or abs(uy) > 0.1:
-            return 0.0
-        return max(0,5.0-abs(z-30.0)-10.0*abs(uz-1.0))
+        # if abs(x-0.5) > 0.01 or abs(y-0.5) > 0.01 or abs(ux) > 1e-6 or abs(uy) > 1e-6:
+        #     return 0
+        global v_T, v_0
+        return (np.pi*v_T**2)**(-0.5) * (np.exp(-(uz-v_0)**2/v_T**2) + np.exp(-(uz+v_0)**2/v_T**2)) * (1+np.cos(noise_f*z)*noise_A)
 
     for idx in tile_grid.local_tile_indices():
         tile = runko.vlv.threeD.Tile(idx, config)
@@ -54,8 +56,9 @@ if __name__ == "__main__":
     simulation.prelude(sync_E)
 
     def lap_function(x):
-        if simulation.lap % 40 == 0:
+        if simulation.lap % 200 == 0:
             x.io_emf_snapshot()
+        x.io_average_E_energy_density()
 
         x.grid_accelerate()
         x.grid_deposit_current()
@@ -66,8 +69,8 @@ if __name__ == "__main__":
         x.grid_Translate()
         x.grid_CleanUp()
 
-        if simulation.lap == 100:
-            x.grid_write_vlv_snapshot()
+        # if simulation.lap == 100:
+        #     x.grid_write_vlv_snapshot()
 
         x.grid_add_current()
 

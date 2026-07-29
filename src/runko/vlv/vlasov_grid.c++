@@ -165,8 +165,8 @@ void DenseGrid::SendData(const tyvi::mdgrid_work& w, VlasovGrid &dest) const {
     try {
         DenseGrid &destination = dynamic_cast<DenseGrid&>(dest);
 
-        auto kernel = [source_mds = new_grid_->mds(), dest_mds = destination.new_grid_->mds()] (const auto &idx) {
-            dest_mds[idx][] += source_mds[idx][];
+        auto kernel = [source_mds = grid_->mds(), dest_mds = destination.grid_->mds()] (const auto &idx) {
+            dest_mds[idx][] = source_mds[idx][];
         };
 
         w.for_each_index(*grid_, std::move(kernel));
