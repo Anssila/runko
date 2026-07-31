@@ -294,9 +294,9 @@ void Tile<D, VGrid>::DebugBC(){
 
     w.wait();
 
-    // Also do periodic BCs for the Yee-lattice
-    this->yee_lattice_.set_E_in_subregion({0,0,-1}, this->yee_lattice_);
-    this->yee_lattice_.set_E_in_subregion({0,0, 1}, this->yee_lattice_);
+    // // Also do periodic BCs for the Yee-lattice
+    // this->yee_lattice_.set_E_in_subregion({0,0,-1}, this->yee_lattice_);
+    // this->yee_lattice_.set_E_in_subregion({0,0, 1}, this->yee_lattice_);
 }
 
 template<std::size_t D, VelGridType VGrid>
@@ -312,7 +312,7 @@ void Tile<D, VGrid>::deposit_current(){
 
     for (auto& species : containers_){
         const auto nh_mds = nonhalo_submds(species.mds());
-        const auto Jmult = static_cast<value_type>(species.charge() * this->cfl_); // What we have to multiply by to get current from v
+        const auto Jmult = static_cast<value_type>(species.charge()); // What we have to multiply by to get current from v
 
         for (auto idx : tyvi::sstd::index_space(J_smds)){
             J_smds[idx][0] = 0.0f;
@@ -371,9 +371,7 @@ Tile<D, VGrid>::send_data(
     switch(static_cast<comm_mode>(mode)) {
         case comm_mode::vlv_particle: {
             // Number of spatial cells (VlasovGrids) in a tile, also including halo regions
-            const auto tot_spatial_cells = (extents_[0] + 2 * halo_size) *
-                                           (extents_[1] + 2 * halo_size) *
-                                           (extents_[2] + 2 * halo_size);
+            const auto tot_spatial_cells = extents_[0] * extents_[1] * extents_[2];
 
             // Helper function to calculate the tag for MPI sends and recvs.
             // Tag must be unique for each idx in the spatial grid of a tile since the communication
@@ -383,8 +381,8 @@ Tile<D, VGrid>::send_data(
                 return runko::checked_cast<int>(
                     static_cast<std::size_t>(tag * this->containers_.size()) * tot_spatial_cells
                     + tot_spatial_cells * species
-                    + idx[0] * (this->extents_[1] + 2 * halo_size) * (this->extents_[2] + 2 * halo_size)
-                    + idx[1] * (this->extents_[2] + 2 * halo_size)
+                    + idx[0] * this->extents_[1] * this->extents_[2]
+                    + idx[1] * this->extents_[2]
                     + idx[2]);
             };
 
@@ -396,7 +394,6 @@ Tile<D, VGrid>::send_data(
 
             // Create a list of requests since each spatial cell and species will have their own
             auto requests = std::vector<mpi4cpp::mpi::request> ();
-
             // Loop through all species
             for (runko::index_t i = 0; i < containers_.size(); i++){
                 const auto mds = containers_[i].mds();
@@ -408,7 +405,7 @@ Tile<D, VGrid>::send_data(
                         static_cast<runko::index_t>(idx[1]),
                         static_cast<runko::index_t>(idx[2])
                     };
-                    if (!is_inside(indices)) continue;
+                    if (is_inside(indices)) continue;
                     const auto v_grid_span = mds[idx][].span();
                     requests.push_back(comm.isend( // Create actual MPI recv
                         dest,
@@ -418,7 +415,6 @@ Tile<D, VGrid>::send_data(
                     ));
                 }
             }
-
             return requests;
         }
         default: return emf::Tile<D>::send_data(comm, dest, mode, tag); // Forward to emf::Tile
@@ -445,13 +441,10 @@ std::vector<mpi4cpp::mpi::request>
 
     // Check which mode we are communicating in; only modes relevant for vlv::Tile are processed here, 
     // rest are forwarded to emf::Tile
-
     switch(static_cast<comm_mode>(mode)) {
         case comm_mode::vlv_particle: {
             // Number of spatial cells (VlasovGrids) in a tile, also including halo regions
-            const auto tot_spatial_cells = (extents_[0] + 2 * halo_size) *
-                                           (extents_[1] + 2 * halo_size) *
-                                           (extents_[2] + 2 * halo_size);
+            const auto tot_spatial_cells = extents_[0] * extents_[1] * extents_[2];
 
             // Helper function to calculate the tag for MPI sends and recvs.
             // Tag must be unique for each idx in the spatial grid of a tile since the communication
@@ -461,8 +454,8 @@ std::vector<mpi4cpp::mpi::request>
                 return runko::checked_cast<int>(
                     static_cast<std::size_t>(tag * this->containers_.size()) * tot_spatial_cells
                     + tot_spatial_cells * species
-                    + idx[0] * (this->extents_[1] + 2 * halo_size) * (this->extents_[2] + 2 * halo_size)
-                    + idx[1] * (this->extents_[2] + 2 * halo_size)
+                    + idx[0] * this->extents_[1] * this->extents_[2]
+                    + idx[1] * this->extents_[2]
                     + idx[2]);
             };
 
@@ -486,7 +479,7 @@ std::vector<mpi4cpp::mpi::request>
                         static_cast<runko::index_t>(idx[1]),
                         static_cast<runko::index_t>(idx[2])
                     };
-                    if (!is_inside(indices)) continue;
+                    if (is_inside(indices)) continue;
                     const auto v_grid_span = mds[idx][].span();
                     requests.push_back(comm.irecv( // Create actual MPI recv
                         orig,

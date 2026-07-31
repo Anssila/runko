@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 from runko.mpiio_reader import read_field_snapshot
 
-
 # read simulation output file and reshape to python format
 def read_full_box(path, var_name):
     return read_field_snapshot(path)[var_name]
@@ -45,7 +44,12 @@ def plot_energy(datas, fig, ax, names):
     i = 0
     for data in datas:
         x_data, y_data = zip(*data)
-        ax.semilogy(x_data, y_data, label=names[i])
+        # ax.semilogy(x_data, y_data, label=names[i])
+        log_data = np.log(y_data)
+        gradient = np.gradient(log_data, x_data)
+        gradient = (gradient - np.ones(len(gradient)) * min(gradient)) / (max(gradient) - min(gradient)) * (max(log_data) - min(log_data)) + np.ones(len(gradient)) * min(log_data)
+        ax.plot(x_data, log_data, label=names[i])
+        ax.plot(x_data, gradient, label=f"d/dx {i}")
         i += 1
     ax.set_title("Sähkökentän keskimääräinen energiatiheys aika-askeleen funktiona")
     ax.set_xlabel("Aika-askel")
