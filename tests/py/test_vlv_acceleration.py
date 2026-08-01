@@ -87,9 +87,9 @@ class vlv_tile_accelerate(unittest.TestCase):
         # Test that the formed current is correct
         (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
         for x_,y_,z_ in itertools.product(range(config.n_cells_per_tile[0]), range(config.n_cells_per_tile[1]), range(config.n_cells_per_tile[2])):
-            self.assertAlmostEqual(J0x[x_][y_][z_], config.q0**2/config.m0*config.cfl*E0x[x_][y_][z_],5)
-            self.assertAlmostEqual(J0y[x_][y_][z_], config.q0**2/config.m0*config.cfl*E0y[x_][y_][z_],5)
-            self.assertAlmostEqual(J0z[x_][y_][z_], config.q0**2/config.m0*config.cfl*E0z[x_][y_][z_],5)
+            self.assertAlmostEqual(J0x[x_][y_][z_], config.q0**2/config.m0*E0x[x_][y_][z_],5)
+            self.assertAlmostEqual(J0y[x_][y_][z_], config.q0**2/config.m0*E0y[x_][y_][z_],5)
+            self.assertAlmostEqual(J0z[x_][y_][z_], config.q0**2/config.m0*E0z[x_][y_][z_],5)
 
 if __name__ == "__main__":
     unittest.main()

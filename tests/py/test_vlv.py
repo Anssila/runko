@@ -253,8 +253,8 @@ class vlv_tile_general(unittest.TestCase):
             tot += sum(sum(sum(tile.GetVelDistribution(1,1,i,0))))
         self.assertAlmostEqual(tot, config.n_cells_per_tile[2]*125*14)
 
-        tile.Translate()
         tile.DebugBC()
+        tile.Translate()
         tile.CleanUp()
 
         tot = 0

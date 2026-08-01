@@ -156,12 +156,12 @@ class vlv_tile_current_deposition(unittest.TestCase):
         tile.add_current()
 
         (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
-        self.assertAlmostEqual(J0x[1][1][1], v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
-        self.assertAlmostEqual(J0y[1][1][1], -2*v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
-        self.assertAlmostEqual(J0z[1][1][1], 1.5*v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
-        self.assertAlmostEqual(E0x[1][1][1], -v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
-        self.assertAlmostEqual(E0y[1][1][1], +2*v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
-        self.assertAlmostEqual(E0z[1][1][1], -1.5*v_0 * (config.q0**2+config.q1**2) * config.cfl,2)
+        self.assertAlmostEqual(J0x[1][1][1], v_0 * (config.q0**2+config.q1**2),2)
+        self.assertAlmostEqual(J0y[1][1][1], -2*v_0 * (config.q0**2+config.q1**2),2)
+        self.assertAlmostEqual(J0z[1][1][1], 1.5*v_0 * (config.q0**2+config.q1**2),2)
+        self.assertAlmostEqual(E0x[1][1][1], -v_0 * (config.q0**2+config.q1**2),2)
+        self.assertAlmostEqual(E0y[1][1][1], +2*v_0 * (config.q0**2+config.q1**2),2)
+        self.assertAlmostEqual(E0z[1][1][1], -1.5*v_0 * (config.q0**2+config.q1**2),2)
 
 if __name__ == "__main__":
     unittest.main()

@@ -287,19 +287,15 @@ void Tile<D, VGrid>::DebugBC(){
 
 
         for (auto idx : tyvi::sstd::index_space(z_left_halo)){
-            z_left_halo[idx][].SendData(w,z_left_dest[idx][]);
+            z_left_halo[idx][].recv_data(w,z_left_dest[idx][]);
         }
 
         for (auto idx : tyvi::sstd::index_space(z_right_halo)){
-            z_right_halo[idx][].SendData(w,z_right_dest[idx][]);
+            z_right_halo[idx][].recv_data(w,z_right_dest[idx][]);
         }
     }
 
     w.wait();
-
-    // Also do periodic BCs for the Yee-lattice
-    this->yee_lattice_.set_E_in_subregion({0,0,-1}, this->yee_lattice_);
-    this->yee_lattice_.set_E_in_subregion({0,0, 1}, this->yee_lattice_);
 }
 
 template<std::size_t D, VelGridType VGrid>
@@ -315,7 +311,7 @@ void Tile<D, VGrid>::deposit_current(){
 
     for (auto& species : containers_){
         const auto nh_mds = nonhalo_submds(species.mds());
-        const auto Jmult = static_cast<value_type>(species.charge() * this->cfl_); // What we have to multiply by to get current from v
+        const auto Jmult = static_cast<value_type>(species.charge()); // What we have to multiply by to get current from v
 
         for (auto idx : tyvi::sstd::index_space(J_smds)){
             J_smds[idx][0] += nh_mds[idx][].CalculateMoment(w, vx_lambda) * Jmult;
@@ -375,9 +371,7 @@ Tile<D, VGrid>::send_data(
     switch(static_cast<comm_mode>(mode)) {
         case comm_mode::vlv_particle: {
             // Number of spatial cells (VlasovGrids) in a tile, also including halo regions
-            const auto tot_spatial_cells = (extents_[0] + 2 * halo_size) *
-                                           (extents_[1] + 2 * halo_size) *
-                                           (extents_[2] + 2 * halo_size);
+            const auto tot_spatial_cells = extents_[0] * extents_[1] * extents_[2];
 
             // Helper function to calculate the tag for MPI sends and recvs.
             // Tag must be unique for each idx in the spatial grid of a tile since the communication
@@ -387,16 +381,16 @@ Tile<D, VGrid>::send_data(
                 return runko::checked_cast<int>(
                     static_cast<std::size_t>(tag * this->containers_.size()) * tot_spatial_cells
                     + tot_spatial_cells * species
-                    + idx[0] * (this->extents_[1] + 2 * halo_size) * (this->extents_[2] + 2 * halo_size)
-                    + idx[1] * (this->extents_[2] + 2 * halo_size)
+                    + idx[0] * this->extents_[1] * this->extents_[2]
+                    + idx[1] * this->extents_[2]
                     + idx[2]);
             };
 
-            auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
-                return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
-                       idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
-                       idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
-            };
+            // auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
+            //     return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
+            //            idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
+            //            idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
+            // };
 
             // Create a list of requests since each spatial cell and species will have their own
             auto requests = std::vector<mpi4cpp::mpi::request> ();
@@ -412,7 +406,7 @@ Tile<D, VGrid>::send_data(
                         static_cast<runko::index_t>(idx[1]),
                         static_cast<runko::index_t>(idx[2])
                     };
-                    if (!is_inside(indices)) continue;
+                    // if (is_inside(indices)) continue;
                     const auto v_grid_span = mds[idx][].span();
                     requests.push_back(comm.isend( // Create actual MPI recv
                         dest,
@@ -422,7 +416,6 @@ Tile<D, VGrid>::send_data(
                     ));
                 }
             }
-
             return requests;
         }
         default: return emf::Tile<D>::send_data(comm, dest, mode, tag); // Forward to emf::Tile
@@ -453,9 +446,7 @@ std::vector<mpi4cpp::mpi::request>
     switch(static_cast<comm_mode>(mode)) {
         case comm_mode::vlv_particle: {
             // Number of spatial cells (VlasovGrids) in a tile, also including halo regions
-            const auto tot_spatial_cells = (extents_[0] + 2 * halo_size) *
-                                           (extents_[1] + 2 * halo_size) *
-                                           (extents_[2] + 2 * halo_size);
+            const auto tot_spatial_cells = extents_[0] * extents_[1] * extents_[2];
 
             // Helper function to calculate the tag for MPI sends and recvs.
             // Tag must be unique for each idx in the spatial grid of a tile since the communication
@@ -465,16 +456,16 @@ std::vector<mpi4cpp::mpi::request>
                 return runko::checked_cast<int>(
                     static_cast<std::size_t>(tag * this->containers_.size()) * tot_spatial_cells
                     + tot_spatial_cells * species
-                    + idx[0] * (this->extents_[1] + 2 * halo_size) * (this->extents_[2] + 2 * halo_size)
-                    + idx[1] * (this->extents_[2] + 2 * halo_size)
+                    + idx[0] * this->extents_[1] * this->extents_[2]
+                    + idx[1] * this->extents_[2]
                     + idx[2]);
             };
 
-            auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
-                return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
-                       idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
-                       idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
-            };
+            // auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
+            //     return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
+            //            idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
+            //            idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
+            // };
 
             // Create a list of requests since each spatial cell and species will have their own
             auto requests = std::vector<mpi4cpp::mpi::request> ();
@@ -490,7 +481,7 @@ std::vector<mpi4cpp::mpi::request>
                         static_cast<runko::index_t>(idx[1]),
                         static_cast<runko::index_t>(idx[2])
                     };
-                    if (!is_inside(indices)) continue;
+                    // if (is_inside(indices)) continue;
                     const auto v_grid_span = mds[idx][].span();
                     requests.push_back(comm.irecv( // Create actual MPI recv
                         orig,
