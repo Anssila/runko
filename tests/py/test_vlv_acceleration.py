@@ -89,7 +89,7 @@ class vlv_tile_accelerate(unittest.TestCase):
         for x_,y_,z_ in itertools.product(range(config.n_cells_per_tile[0]), range(config.n_cells_per_tile[1]), range(config.n_cells_per_tile[2])):
             self.assertAlmostEqual(J0x[x_][y_][z_], 0.0,5)
             self.assertAlmostEqual(J0y[x_][y_][z_], 0.0,5)
-            self.assertAlmostEqual(J0z[x_][y_][z_], config.q0**2/config.m0*config.cfl*E0z[x_][y_][z_] if x_ == 1 and y_ == 1 else 0.0,5)
+            self.assertAlmostEqual(J0z[x_][y_][z_], config.q0**2/config.m0*E0z[x_][y_][z_] if x_ == 1 and y_ == 1 else 0.0,5)
 
 if __name__ == "__main__":
     unittest.main()

@@ -235,7 +235,7 @@ void Tile<D, VGrid>::Translate(){
             neighbors.push_back(&mds[0,0,idx[2]+0+halo_size-1][]); 
             neighbors.push_back(&mds[0,0,idx[2]+1+halo_size-1][]); 
 
-            mds[0,0,idx[2]+halo_size][].TranslateZ(w, neighbors, static_cast<value_type>(this->cfl_));
+            mds[0,0,idx[2]+halo_size-1][].TranslateZ(w, neighbors, static_cast<value_type>(this->cfl_));
         }
     }
     w.wait();
@@ -283,20 +283,16 @@ void Tile<D, VGrid>::DebugBC(){
         const auto z_right_dest = std::submdspan( std::forward<decltype(species.mds())>(species.mds()), x_full, y_full, std::tuple { halo_size , 2 * halo_size } );
 
 
-        for (auto idx : tyvi::sstd::index_space(z_left_dest)){
+        for (auto idx : tyvi::sstd::index_space(z_left_halo)){
             z_left_halo[idx][].recv_data(w,z_left_dest[idx][]);
         }
 
-        for (auto idx : tyvi::sstd::index_space(z_right_dest)){
+        for (auto idx : tyvi::sstd::index_space(z_right_halo)){
             z_right_halo[idx][].recv_data(w,z_right_dest[idx][]);
         }
     }
 
     w.wait();
-
-    // // Also do periodic BCs for the Yee-lattice
-    // this->yee_lattice_.set_E_in_subregion({0,0,-1}, this->yee_lattice_);
-    // this->yee_lattice_.set_E_in_subregion({0,0, 1}, this->yee_lattice_);
 }
 
 template<std::size_t D, VelGridType VGrid>
@@ -386,10 +382,16 @@ Tile<D, VGrid>::send_data(
                     + idx[2]);
             };
 
+            // Function to check whether or not the given index is inside the hollow grid we need to communicate
+            // i.e. we skip the halo regions (they are only needed for local comm) but also the very inside of the
+            // grid from where no halo region of a neighboring tile will need data
             auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
-                return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
-                       idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
-                       idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
+                return (idx[0] >=      halo_size && idx[0] < this->extents_[0] -      halo_size && // Halo regions
+                        idx[1] >=      halo_size && idx[1] < this->extents_[1] -      halo_size &&
+                        idx[2] >=      halo_size && idx[2] < this->extents_[2] -      halo_size)&&
+                      !(idx[0] >= 2u * halo_size && idx[0] < this->extents_[0] - 2u * halo_size && // Hollow region
+                        idx[1] >= 2u * halo_size && idx[1] < this->extents_[1] - 2u * halo_size &&
+                        idx[2] >= 2u * halo_size && idx[2] < this->extents_[2] - 2u * halo_size);
             };
 
             // Create a list of requests since each spatial cell and species will have their own
@@ -407,7 +409,7 @@ Tile<D, VGrid>::send_data(
                     };
                     if (is_inside(indices)) continue;
                     const auto v_grid_span = mds[idx][].span();
-                    requests.push_back(comm.isend( // Create actual MPI recv
+                    requests.push_back(comm.isend( // Create actual MPI send
                         dest,
                         get_vlv_tag(indices, i),
                         v_grid_span.data(), 
@@ -459,10 +461,16 @@ std::vector<mpi4cpp::mpi::request>
                     + idx[2]);
             };
 
+            // Function to check whether or not the given index is inside the hollow grid we need to communicate
+            // i.e. we skip the halo regions (they are only needed for local comm) but also the very inside of the
+            // grid from where no halo region of a neighboring tile will need data
             auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
-                return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
-                       idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
-                       idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
+                return (idx[0] >=      halo_size && idx[0] < this->extents_[0] -      halo_size && // Halo regions
+                        idx[1] >=      halo_size && idx[1] < this->extents_[1] -      halo_size &&
+                        idx[2] >=      halo_size && idx[2] < this->extents_[2] -      halo_size)&&
+                      !(idx[0] >= 2u * halo_size && idx[0] < this->extents_[0] - 2u * halo_size && // Hollow region
+                        idx[1] >= 2u * halo_size && idx[1] < this->extents_[1] - 2u * halo_size &&
+                        idx[2] >= 2u * halo_size && idx[2] < this->extents_[2] - 2u * halo_size);
             };
 
             // Create a list of requests since each spatial cell and species will have their own

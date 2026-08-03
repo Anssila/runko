@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from runko.mpiio_reader import read_field_snapshot
+import pickle
+import runko
 
 # read simulation output file and reshape to python format
 def read_full_box(path, var_name):
@@ -23,6 +25,22 @@ def read_je(path_to_h5: str):
     ez = read_full_box(path_to_h5, "ez")
 
     return jx * ex + jy * ey + jz * ez
+
+def plot_energy(datas, fig, ax, names, config : runko.Configuration):
+    i = 0
+    for data in datas:
+        x_data, y_data = zip(*data)
+        x_data = np.array(x_data)
+        y_data = np.array(y_data)
+        ax.semilogy(x_data * config.omega_p, y_data, label=names[i])
+        analytic_y = 0.02*y_data[0] * np.exp(x_data * config.omega_p * 1.5)
+        ax.semilogy(x_data * config.omega_p, analytic_y, label=names[i] + "_analytic")
+
+        i += 1
+    ax.set_title("Sähkökentän keskimääräinen energiatiheys aika-askeleen funktiona")
+    ax.set_xlabel("Aika-askel")
+    ax.set_ylabel("Sähkökentän energia $\\langle \\hat{E}^2 \\rangle / 8\\pi$")
+
 
 
 def plot(data, fig, ax, vmin=None, vmax=None, cblabel=""):
@@ -55,8 +73,8 @@ def plot_energy(datas, fig, ax, names):
     ax.set_xlabel("Aika-askel")
     ax.set_ylabel("Sähkökentän energia $\\langle \\hat{E}^2 \\rangle / 8\\pi$")
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     var = sys.argv[1]
     if var == "e2":
         filenames = sys.argv[2:]
@@ -64,7 +82,14 @@ if __name__ == "__main__":
         datas = []
         for filename in filenames:
             datas.append(np.loadtxt(filename))
-        plot_energy(datas, fig, ax, [name[name.find("average_E_energy_density"):-4] for name in filenames])
+        config_filename = filenames[0][:filenames[0].find("average_E_energy_density")] + "config.pkl"
+        config = None
+        try:
+            with open(config_filename, 'rb') as file:
+                config = pickle.load(file)
+        except:
+            print("Failed to open config file!")
+        plot_energy(datas, fig, ax, [name[name.find("average_E_energy_density"):-4] for name in filenames], config)
         plt.legend()
         plt.show()
     else:

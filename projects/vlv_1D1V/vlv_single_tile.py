@@ -29,7 +29,7 @@ if __name__ == "__main__":
     config.u_max = [1.0,1.0,1.0]
     config.cfl = 0.5
 
-    skin_depth = 30.0
+    skin_depth = 20.0
 
     omega_p = config.cfl / skin_depth
 
@@ -51,10 +51,9 @@ if __name__ == "__main__":
     n_0 = config.n0
 
     def vlv0(x,y,z,ux,uy,uz):
-        # if abs(x-0.5) > 0.01 or abs(y-0.5) > 0.01 or abs(ux) > 1e-6 or abs(uy) > 1e-6:
-        #     return 0
         global v_T, v_0, actual_n, n_0
         return n_0/actual_n * (np.pi*v_T**2)**(-0.5) * (np.exp(-(uz-v_0)**2/v_T**2) + np.exp(-(uz+v_0)**2/v_T**2)) * (1+np.cos(noise_f*z) % noise_A)
+
 
     tile = runko.vlv.threeD.Tile((0,0,0), config)
     tile.set_EBJ(E0, B0, J0)
@@ -153,7 +152,6 @@ if __name__ == "__main__":
     plt.show()
     if filename != "":
         ani.save(filename=filename, writer="pillow")
-
     y_data, x_data = zip(*totE)
     plt.plot(x_data, y_data, label="simulation")
     plt.plot(x_data, analytic_y, label="theory")
