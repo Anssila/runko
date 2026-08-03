@@ -11,20 +11,20 @@ if __name__ == "__main__":
     config = runko.Configuration(None)
     config.io_outdir = "two-stream"
     config.tile_partitioning = "hilbert_curve"
-    config.n_laps = 2000
-    config.n_tiles = [1, 1, 4]
-    config.n_cells_per_tile = [3, 3, 20]
-    config.v_grid_extents = [3,3,80]
+    config.n_laps = 1000
+    config.n_tiles = [1, 1, 8]
+    config.n_cells_per_tile = [3, 3, 40]
+    config.v_grid_extents = [3,3,360]
     config.u_max = [1.0,1.0,1.0]
-    config.cfl = 0.5
+    config.cfl = 1.0
 
-    skin_depth = 30.0
+    config.skin_depth = 40.0
 
-    omega_p = config.cfl / skin_depth
+    config.omega_p = config.cfl / config.skin_depth
     config.field_propagator = "fdtd2"
     config.m0 = 1.0
     config.n0 = 1.0
-    config.q0 = omega_p * np.sqrt(config.m0/config.n0) # q = sqrt(omega_p^2*m/n)
+    config.q0 = config.omega_p * np.sqrt(config.m0/config.n0) # q = sqrt(omega_p^2*m/n)
     v_T = config.u_max[2]/100.0
     v_0 = config.u_max[2]/4.0
     noise_A = 1e-6
@@ -79,8 +79,8 @@ if __name__ == "__main__":
         x.grid_Translate()
         x.grid_CleanUp()
 
-        if simulation.lap == 100:
-            x.grid_write_vlv_snapshot()
+        # if simulation.lap == 100:
+        #     x.grid_write_vlv_snapshot()
 
         x.grid_add_current()
 
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         # x.grid_push_e()
 
 
-        if simulation.lap % 100 == 0:
+        if simulation.lap % 10 == 0:
             simulation.log_timer_statistics()
 
     simulation.for_each_lap(lap_function)

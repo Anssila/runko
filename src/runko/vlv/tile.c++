@@ -386,11 +386,17 @@ Tile<D, VGrid>::send_data(
                     + idx[2]);
             };
 
-            // auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
-            //     return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
-            //            idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
-            //            idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
-            // };
+            // Function to check whether or not the given index is inside the hollow grid we need to communicate
+            // i.e. we skip the halo regions (they are only needed for local comm) but also the very inside of the
+            // grid from where no halo region of a neighboring tile will need data
+            auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
+                return (idx[0] >=      halo_size && idx[0] < this->extents_[0] -      halo_size && // Halo regions
+                        idx[1] >=      halo_size && idx[1] < this->extents_[1] -      halo_size &&
+                        idx[2] >=      halo_size && idx[2] < this->extents_[2] -      halo_size)&&
+                      !(idx[0] >= 2u * halo_size && idx[0] < this->extents_[0] - 2u * halo_size && // Hollow region
+                        idx[1] >= 2u * halo_size && idx[1] < this->extents_[1] - 2u * halo_size &&
+                        idx[2] >= 2u * halo_size && idx[2] < this->extents_[2] - 2u * halo_size);
+            };
 
             // Create a list of requests since each spatial cell and species will have their own
             auto requests = std::vector<mpi4cpp::mpi::request> ();
@@ -406,9 +412,9 @@ Tile<D, VGrid>::send_data(
                         static_cast<runko::index_t>(idx[1]),
                         static_cast<runko::index_t>(idx[2])
                     };
-                    // if (is_inside(indices)) continue;
+                    if (!is_inside(indices)) continue;
                     const auto v_grid_span = mds[idx][].span();
-                    requests.push_back(comm.isend( // Create actual MPI recv
+                    requests.push_back(comm.isend( // Create actual MPI send
                         dest,
                         get_vlv_tag(indices, i),
                         v_grid_span.data(), 
@@ -461,11 +467,17 @@ std::vector<mpi4cpp::mpi::request>
                     + idx[2]);
             };
 
-            // auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
-            //     return idx[0] >= halo_size && idx[0] < this->extents_[0] - halo_size &&
-            //            idx[1] >= halo_size && idx[1] < this->extents_[1] - halo_size &&
-            //            idx[2] >= halo_size && idx[2] < this->extents_[2] - halo_size;
-            // };
+            // Function to check whether or not the given index is inside the hollow grid we need to communicate
+            // i.e. we skip the halo regions (they are only needed for local comm) but also the very inside of the
+            // grid from where no halo region of a neighboring tile will need data
+            auto is_inside = [this] (std::array<runko::index_t,3> idx) -> bool {
+                return (idx[0] >=      halo_size && idx[0] < this->extents_[0] -      halo_size && // Halo regions
+                        idx[1] >=      halo_size && idx[1] < this->extents_[1] -      halo_size &&
+                        idx[2] >=      halo_size && idx[2] < this->extents_[2] -      halo_size)&&
+                      !(idx[0] >= 2u * halo_size && idx[0] < this->extents_[0] - 2u * halo_size && // Hollow region
+                        idx[1] >= 2u * halo_size && idx[1] < this->extents_[1] - 2u * halo_size &&
+                        idx[2] >= 2u * halo_size && idx[2] < this->extents_[2] - 2u * halo_size);
+            };
 
             // Create a list of requests since each spatial cell and species will have their own
             auto requests = std::vector<mpi4cpp::mpi::request> ();
@@ -481,7 +493,7 @@ std::vector<mpi4cpp::mpi::request>
                         static_cast<runko::index_t>(idx[1]),
                         static_cast<runko::index_t>(idx[2])
                     };
-                    // if (is_inside(indices)) continue;
+                    if (!is_inside(indices)) continue;
                     const auto v_grid_span = mds[idx][].span();
                     requests.push_back(comm.irecv( // Create actual MPI recv
                         orig,

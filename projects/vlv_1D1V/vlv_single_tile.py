@@ -29,7 +29,7 @@ if __name__ == "__main__":
     config.u_max = [1.0,1.0,1.0]
     config.cfl = 0.5
 
-    skin_depth = 30.0
+    skin_depth = 20.0
 
     omega_p = config.cfl / skin_depth
 
