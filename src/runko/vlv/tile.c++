@@ -195,16 +195,32 @@ void Tile<D, VGrid>::write_vlv_snapshot() {
     auto containers = containers_.size();
     stream.write(reinterpret_cast<const char *>(&containers), sizeof(containers));
     for (runko::index_t i = 0; i < containers_.size(); i++){
-        auto mds = containers_[i].mds();
+
+        auto snapshot = get_vlasov_snapshot(i);
+        auto mds = snapshot.mds();
         auto size = mds.size();
-        auto exs = std::array<std::size_t,3>{mds.extent(0),mds.extent(1),mds.extent(2)};
+        auto exs = std::array<std::size_t,6>{
+            mds.extent(0),mds.extent(1),mds.extent(2),
+            mds.extent(3),mds.extent(4),mds.extent(5)
+        };
+
         stream.write(reinterpret_cast<const char *>(&size), sizeof(size));
-        stream.write(reinterpret_cast<const char *>(&exs[0]), sizeof(exs[0])*3);
-        for (auto idx : tyvi::sstd::index_space(mds)){
-            const auto w = tyvi::mdgrid_work{};
-            value_type tot_fluid = mds[idx][].CalculateMoment(w, [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma) {return 1.0;});
-            stream.write(reinterpret_cast<const char *>(&tot_fluid), sizeof(value_type));
-        }
+        stream.write(reinterpret_cast<const char *>(&exs[0]), sizeof(exs[0])*6);
+
+        auto span = snapshot.span();
+
+        stream.write(reinterpret_cast<const char *>(span.data()), sizeof(value_type) * size);
+
+        // auto mds = containers_[i].mds();
+        // auto size = mds.size();
+        // auto exs = std::array<std::size_t,3>{mds.extent(0),mds.extent(1),mds.extent(2)};
+        // stream.write(reinterpret_cast<const char *>(&size), sizeof(size));
+        // stream.write(reinterpret_cast<const char *>(&exs[0]), sizeof(exs[0])*3);
+        // for (auto idx : tyvi::sstd::index_space(mds)){
+        //     const auto w = tyvi::mdgrid_work{};
+        //     value_type tot_fluid = mds[idx][].CalculateMoment(w, [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma) {return 1.0;});
+        //     stream.write(reinterpret_cast<const char *>(&tot_fluid), sizeof(value_type));
+        // }
     }
     stream.close();
 
@@ -518,6 +534,8 @@ void Tile<D, VGrid>::local_communication(
 {
     auto const* const other_base_ptr = &other_base;
     using runko::comm_mode;
+
+    if (dir_to_other[0] != 0 || dir_to_other[1] != 0) return;
 
     // First check if the communication is not something that needs vlv::Tile
     if(static_cast<comm_mode>(mode) != comm_mode::vlv_particle) {

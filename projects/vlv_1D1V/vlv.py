@@ -13,8 +13,8 @@ if __name__ == "__main__":
     config.tile_partitioning = "hilbert_curve"
     config.n_laps = 1000
     config.n_tiles = [1, 1, 8]
-    config.n_cells_per_tile = [3, 3, 40]
-    config.v_grid_extents = [3,3,360]
+    config.n_cells_per_tile = [3, 3, 32]
+    config.v_grid_extents = [3,3,256]
     config.u_max = [1.0,1.0,1.0]
     config.cfl = 1.0
 
@@ -79,8 +79,8 @@ if __name__ == "__main__":
         x.grid_Translate()
         x.grid_CleanUp()
 
-        # if simulation.lap == 100:
-        #     x.grid_write_vlv_snapshot()
+        if simulation.lap == 100:
+            x.grid_write_vlv_snapshot()
 
         x.grid_add_current()
 
