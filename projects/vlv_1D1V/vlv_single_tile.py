@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.colors import LogNorm
+from scipy.special import erf
 
 def maxwell_distr(vx, vy, vz, v_0):# reference velocity = sqrt((2*k*T)/m) (m is mass, k is boltzmann const, T is temperature)
     return (np.pi*v_0**2)**(-0.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
@@ -26,21 +27,23 @@ if __name__ == "__main__":
     config.n_tiles = [1, 1, 1]
     config.n_cells_per_tile = [3, 3, spatial_ex]
     config.v_grid_extents = [3,3,vel_ex]
-    config.u_max = [1.0,1.0,1.0]
-    config.cfl = 0.5
+    config.u_max = [6.0,6.0,6.0]
+    config.cfl = 0.45
 
-    skin_depth = 20.0
+    skin_depth = 5.0
 
     omega_p = config.cfl / skin_depth
+
+    vel_res = config.u_max[2] / (vel_ex-1) * 2.0
 
     config.field_propagator = "fdtd2"
     config.m0 = 1.0
     config.n0 = 1.0
-    config.q0 = omega_p * np.sqrt(config.m0/config.n0) # q = sqrt(omega_p^2*m/n)
-    v_T = config.u_max[2]/100.0
-    v_0 = config.u_max[2]/4.0
+    config.q0 = omega_p * np.sqrt(config.m0/(config.n0)) # q = sqrt(omega_p^2*m/n)
+    v_T = config.u_max[2]/vel_ex*10.0
+    v_0 = config.u_max[2]/2.0
 
-    noise_A = 1e-6
+    noise_A = 2e-6
     noise_f = 0.5*np.pi/spatial_ex
 
     E0 = lambda x, y, z: (0, 0, np.sin(noise_f*z) % noise_A - 0.5 * noise_A)
@@ -49,10 +52,13 @@ if __name__ == "__main__":
 
     actual_n = config.n0
     n_0 = config.n0
+    # alpha = 1.0
 
     def vlv0(x,y,z,ux,uy,uz):
         global v_T, v_0, actual_n, n_0
-        return n_0/actual_n * (np.pi*v_T**2)**(-0.5) * (np.exp(-(uz-v_0)**2/v_T**2) + np.exp(-(uz+v_0)**2/v_T**2)) * (1+np.cos(noise_f*z) % noise_A)
+        # z_c = v_T * max(min(1e-4,1.0-10.0*abs(z)),0.0)
+        return n_0/actual_n * (np.pi*v_T**2)**(-0.5) * (np.exp(-((uz-v_0)**2)/v_T**2) + np.exp(-((uz+v_0)**2)/v_T**2)) #* (1+np.cos(noise_f*z) % noise_A)
+        #return n_0/actual_n * (np.pi*v_T**2)**(-0.5) * 0.5 * (erf((uz + vel_res/2 - v_0)/v_T) - erf((uz - vel_res/2 - v_0)/v_T))# * (1+np.cos(noise_f*z) % noise_A) #+ np.exp(-(uz+v_0)**2/v_T**2)
 
 
     tile = runko.vlv.threeD.Tile((0,0,0), config)
@@ -63,11 +69,13 @@ if __name__ == "__main__":
     # average number density of plasma in the simulation
     actual_n = 0.5 * sum([tile.CalculateMoment(0,0,i, lambda x, y, z, gamma : 1.0, 0) for i in range(spatial_ex)])/spatial_ex # TODO: use both or just one species here?
 
+    print(f"Actual n in simulation: {actual_n}, fixing...")
+
     tile.set_vlv(vlv0, 0)
     tile.DebugBC()
-
     # omega_p = np.sqrt(config.cfl * config.q0**2/config.m0*avg_n) # calculate plasma frequency using avg_n
-    gamma_m = omega_p # calculate maximum growth rate
+    gamma_b = np.sqrt(1 + v_0**2)
+    gamma_m = omega_p * gamma_b**-1.5 # calculate maximum growth rate
     k_m = np.sqrt(3)/4*omega_p / v_0 / config.cfl# calculate wave number for the maximally growing mode (/4 because we have symmetrical beams)
 
     energy_0 = 0.0
@@ -75,7 +83,7 @@ if __name__ == "__main__":
     print(f"Plasma freq: {omega_p}")
     print(f"Maximum growth rate: {gamma_m}")
     print(f"Wave length of maximum growing mode: {2*np.pi/k_m}")
-    print(f"Estimated number of cycles: {k_m * spatial_ex / (2*np.pi)}")
+    print(f"Estimated number of cycles: {k_m * spatial_ex}")
 
     data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
     (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
@@ -83,7 +91,7 @@ if __name__ == "__main__":
     j_data = J0z[1][1]
     np.set_printoptions(linewidth=200,precision=4,threshold=3*3*spatial_ex*3*3*vel_ex)
     # print(data)
-    fig, axs = plt.subplots(1,2)
+    fig, axs = plt.subplots(2,1)
     im = []
     im.append(axs[0].imshow(data0, norm=LogNorm(vmin=1e-8, vmax=(np.pi*v_T**2)**(-0.5)), extent=[-spatial_ex//2,spatial_ex//2,-config.u_max[2],config.u_max[2]]))
     cbar = fig.colorbar(im[0], ax=axs[0], label="Lukumäärätiheys")

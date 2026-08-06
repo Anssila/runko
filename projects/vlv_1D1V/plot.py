@@ -58,21 +58,68 @@ def plot(data, fig, ax, vmin=None, vmax=None, cblabel=""):
                  orientation=None,
                  label=cblabel)
 
-def plot_energy(datas, fig, ax, names):
-    i = 0
+def plot_in_time(datas, fig, ax):
+    all_data = []
     for data in datas:
+        z_data = data[:,1,1]
+        vmin = min(z_data)
+        vmax = max(z_data)
+        z_data = (z_data - 0.5 * (vmax + vmin)) / (0.5 * (vmax-vmin))
+        all_data.append(z_data)
+    all_data = np.array(all_data)
+    print(f"Min: {vmin}, Max: {vmax}")
+    norm = colors.Normalize(vmin=-1.0, vmax=1.0)#, linthresh=1e-7
+    img = ax.imshow(all_data, norm=norm)#, cmap='seismic'
+
+    fig.colorbar(img,
+                 ax=ax,
+                 orientation=None)
+
+def plot_energy(datas, fig, ax : plt.Axes, names, configs : list[runko.Configuration]):
+    for i in range(len(datas)):
+        config = configs[i]
+        data = datas[i]
+        print(f"Parametrit simulaatiolle {names[i]}:")
+        print(f"Plasmataajuus: {config.omega_p}")
+        gamma_b = np.sqrt(1 + config.v_0**2)
+        gamma_m = config.omega_p * gamma_b**-1.5 # calculate maximum growth rate
+        print(f"Maksimaalinen kasvunopeus: {gamma_m}")
+        print(f"cfl: {config.cfl}")
+        print(f"skin_depth: {config.skin_depth}")
+        print()
         x_data, y_data = zip(*data)
-        # ax.semilogy(x_data, y_data, label=names[i])
+        x_data = np.array(x_data)
+        y_data = np.array(y_data)
+        # ax.semilogy(x_data * config.omega_p, y_data, label=names[i])
+        mults = [0.00008, 0.0002]
+        analytic_y = y_data[0] * np.exp(x_data * gamma_m)
+
         log_data = np.log(y_data)
-        gradient = np.gradient(log_data, x_data)
-        gradient = (gradient - np.ones(len(gradient)) * min(gradient)) / (max(gradient) - min(gradient)) * (max(log_data) - min(log_data)) + np.ones(len(gradient)) * min(log_data)
-        ax.plot(x_data, log_data, label=names[i])
-        ax.plot(x_data, gradient, label=f"d/dx {i}")
-        i += 1
+        log_analytic = np.log(analytic_y)
+
+        index = -1
+        for j in range(len(x_data)):
+            if x_data[j] >= 100.0/config.omega_p:
+                index = j
+                break
+
+        log_data -= log_data[index]
+        log_analytic -= log_analytic[index]
+        fmt = "-"
+        if i > 3*len(datas)//4:
+            fmt = ":"
+        elif i > len(datas)//2:
+            fmt = "-."
+        elif i > len(datas)//4:
+            fmt = "--"
+        ax.plot(x_data * config.omega_p, log_data, fmt, label=names[i])
+        if i == 0:
+            ax.plot(x_data * config.omega_p, log_analytic, label=names[i] + "_analytic")
+        # ax.semilogy(x_data * config.omega_p, analytic_y, label=names[i] + "_analytic")
+
     ax.set_title("Sähkökentän keskimääräinen energiatiheys aika-askeleen funktiona")
     ax.set_xlabel("Aika-askel")
     ax.set_ylabel("Sähkökentän energia $\\langle \\hat{E}^2 \\rangle / 8\\pi$")
-
 
 if __name__ == "__main__":
     var = sys.argv[1]
@@ -80,17 +127,27 @@ if __name__ == "__main__":
         filenames = sys.argv[2:]
         fig, ax = plt.subplots()
         datas = []
+        configs = []
         for filename in filenames:
             datas.append(np.loadtxt(filename))
-        config_filename = filenames[0][:filenames[0].find("average_E_energy_density")] + "config.pkl"
-        config = None
-        try:
-            with open(config_filename, 'rb') as file:
-                config = pickle.load(file)
-        except:
-            print("Failed to open config file!")
-        plot_energy(datas, fig, ax, [name[name.find("average_E_energy_density"):-4] for name in filenames], config)
+            config_filename = filename[:filename.find("average_E_energy_density")] + "config.pkl"
+            try:
+                with open(config_filename, 'rb') as file:
+                    configs.append(pickle.load(file))
+            except:
+                print("Failed to open config file!")
+
+        plot_energy(datas, fig, ax, [name[:name.find("average_E_energy_density")] for name in filenames], configs)
         plt.legend()
+        plt.show()
+    elif var == "et":
+        filenames = sys.argv[2:]
+        filenames.sort(key = lambda name : int(name[name.find("flds")+5:-4]))
+        fig, ax = plt.subplots()
+        datas = []
+        for filename in filenames:
+            datas.append(read_full_box(filename, "ez"))
+        plot_in_time(datas, fig, ax)
         plt.show()
     else:
         filenames = sys.argv[2:] 

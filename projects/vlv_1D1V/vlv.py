@@ -11,23 +11,29 @@ if __name__ == "__main__":
     config = runko.Configuration(None)
     config.io_outdir = "two-stream"
     config.tile_partitioning = "hilbert_curve"
-    config.n_laps = 1000
-    config.n_tiles = [1, 1, 8]
-    config.n_cells_per_tile = [3, 3, 40]
-    config.v_grid_extents = [3,3,360]
-    config.u_max = [1.0,1.0,1.0]
-    config.cfl = 1.0
+    config.n_tiles = [1, 1, 32]
+    config.n_cells_per_tile = [3, 3, 32]
+    config.v_grid_extents = [3,3,1024]
+    config.u_max = [12.0,12.0,12.0]
+    config.cfl = 0.45
 
-    config.skin_depth = 40.0
+    config.skin_depth = 5.0
+
+    config.io_outdir = "visualization"#"rel_test_" + str(round(config.cfl)) + "_" + str(config.v_grid_extents[2]) + "X" + str(config.n_cells_per_tile[2]*config.n_tiles[2]) #config.io_outdir + "_c_" + str(round(config.cfl)) + "_R_" + str(round(config.skin_depth))
 
     config.omega_p = config.cfl / config.skin_depth
+
+    config.n_laps = 250 / config.omega_p
+
     config.field_propagator = "fdtd2"
     config.m0 = 1.0
     config.n0 = 1.0
     config.q0 = config.omega_p * np.sqrt(config.m0/config.n0) # q = sqrt(omega_p^2*m/n)
-    v_T = config.u_max[2]/100.0
+    v_T = config.u_max[2]/2048*10.0
     v_0 = config.u_max[2]/4.0
-    noise_A = 1e-6
+    config.v_T = v_T
+    config.v_0 = v_0
+    noise_A = 2e-6
     noise_f = 0.5*np.pi/(config.n_cells_per_tile[2]*config.n_tiles[2])
 
     E0 = lambda x, y, z: (0, 0, np.sin(noise_f*z) % noise_A - 0.5 * noise_A)
@@ -46,8 +52,12 @@ if __name__ == "__main__":
         # if abs(x-0.5) > 0.01 or abs(y-0.5) > 0.01 or abs(ux) > 1e-6 or abs(uy) > 1e-6:
         #     return 0
         global v_T, v_0, actual_n, n_0
-        return n_0/actual_n * (np.pi*v_T**2)**(-0.5) * (np.exp(-(uz-v_0)**2/v_T**2) + np.exp(-(uz+v_0)**2/v_T**2)) * (1+np.cos(noise_f*z) % noise_A)
+        return n_0/actual_n * (np.pi*v_T**2)**(-0.5) * (np.exp(-(uz-v_0)**2/v_T**2) + np.exp(-(uz+v_0)**2/v_T**2)) #* (1+np.cos(noise_f*z) % noise_A)
 
+    test_tile = runko.vlv.threeD.Tile((0,0,0), config)
+    test_tile.set_vlv(vlv0,0)
+    actual_n = 0.5 * test_tile.CalculateMoment(0,0,0, lambda x, y, z, gamma : 1.0, 0)
+    print(f"Actual n: {actual_n}, fixing!")
 
     for idx in tile_grid.local_tile_indices():
         tile = runko.vlv.threeD.Tile(idx, config)
@@ -79,8 +89,8 @@ if __name__ == "__main__":
         x.grid_Translate()
         x.grid_CleanUp()
 
-        # if simulation.lap == 100:
-        #     x.grid_write_vlv_snapshot()
+        if simulation.lap == 100:
+            x.grid_write_vlv_snapshot()
 
         x.grid_add_current()
 

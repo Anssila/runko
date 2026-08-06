@@ -12,16 +12,19 @@ def read_snapshot(filename : str, species = 0):
     return data
 
 if __name__ == "__main__":
-    n_tiles = 8
-    fig, axs = plt.subplots(1, n_tiles)
+    n_tiles = 32
+    fig, axs = plt.subplots()
     if n_tiles == 1:
         axs = [axs]
     i = 0
-    imgs = []
+    datas = []
     norm = colors.SymLogNorm(vmin=0, vmax=100.0, linthresh=1e-3)
     for i in range(n_tiles):
-        data = read_snapshot(f"vlv_snapshot(0,0,{i}).bin")
-        imgs.append(axs[i].imshow(data[0], norm= norm))
-    fig.colorbar(imgs[0], ax =axs[i])
+        print(read_snapshot(f"vlv_snapshot(0,0,{i}).bin"))
+        # datas.append([])
 
-    plt.show()
+    # img = ax.imshow()
+
+    # fig.colorbar(imgs[0], ax =axs[i])
+
+    # plt.show()
