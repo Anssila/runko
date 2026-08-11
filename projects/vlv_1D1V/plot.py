@@ -97,11 +97,11 @@ def plot_energy(datas, fig, ax : plt.Axes, names, configs : list[runko.Configura
         log_data = np.log(y_data)
         log_analytic = np.log(analytic_y)
 
-        index = -1
-        for j in range(len(x_data)):
-            if x_data[j] >= 100.0/config.omega_p:
-                index = j
-                break
+        index = len(x_data)//2
+        # for j in range(len(x_data)):
+        #     if x_data[j] >= 100.0/config.omega_p:
+        #         index = j
+        #         break
 
         log_data -= log_data[index]
         log_analytic -= log_analytic[index]

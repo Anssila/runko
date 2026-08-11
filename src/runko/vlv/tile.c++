@@ -103,6 +103,9 @@ Tile<D, VGrid>::Tile(
             break;
         }
     }
+
+    vlv_snapshot_index = 0;
+    io_outdir = conf.get<std::string>("io_outdir").value_or(std::string("sim_out"));
 }
 
 template<std::size_t D, VelGridType VGrid>
@@ -162,7 +165,7 @@ Tile<D, VGrid>::VlasovSnapshot Tile<D, VGrid>::get_vlasov_snapshot(runko::index_
     const auto nh_mds = nonhalo_submds(containers_[species].mds());
     auto snapshot = VlasovSnapshot(
         nh_mds.extent(0),     nh_mds.extent(1),     nh_mds.extent(2), 
-        velocity_extents_[0], velocity_extents_[1], velocity_extents_[2]
+        1, 1, velocity_extents_[2]
     );
     const auto snapshot_mds = snapshot.mds();
 
@@ -173,7 +176,7 @@ Tile<D, VGrid>::VlasovSnapshot Tile<D, VGrid>::get_vlasov_snapshot(runko::index_
             static_cast<runko::index_t>(idx[2]) + emf::halo_size,
             species
         ));
-        const auto grid_mds = grid.GetStagingMDS();
+        const auto grid_mds = std::submdspan(grid.GetStagingMDS(), std::tuple{1,2}, std::tuple{1,2}, std::tuple{0, velocity_extents_[2]});
         for (auto jdx : tyvi::sstd::index_space(grid_mds)){
             const auto snapshot_idx = std::array<std::size_t,6>{
                 idx[0],idx[1],idx[2],
@@ -188,7 +191,7 @@ Tile<D, VGrid>::VlasovSnapshot Tile<D, VGrid>::get_vlasov_snapshot(runko::index_
 
 template<std::size_t D, VelGridType VGrid>
 void Tile<D, VGrid>::write_vlv_snapshot() {
-    auto filename = std::format("vlv_snapshot({},{},{}).bin", this->index[0], this->index[1], this->index[2]);
+    auto filename = std::format("{}/vlv_snapshot({},{},{})_{}.bin", io_outdir, this->index[0], this->index[1], this->index[2], vlv_snapshot_index++);
     std::ofstream stream(filename, std::ios::binary);
     auto containers = containers_.size();
     stream.write(reinterpret_cast<const char *>(&containers), sizeof(containers));

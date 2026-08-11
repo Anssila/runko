@@ -46,6 +46,9 @@ protected:
   const std::array<runko::index_t, 3> velocity_extents_;
   const std::array<runko::index_t, 3> spatial_offset_;
 
+  std::size_t vlv_snapshot_index;
+  std::string io_outdir;
+
   // function for getting the sub mdspan not containing the halo regions
   template<typename MDS>
   auto nonhalo_submds(MDS&& mds) const

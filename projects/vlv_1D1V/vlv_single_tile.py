@@ -27,7 +27,7 @@ if __name__ == "__main__":
     config.n_tiles = [1, 1, 1]
     config.n_cells_per_tile = [3, 3, spatial_ex]
     config.v_grid_extents = [3,3,vel_ex]
-    config.u_max = [6.0,6.0,6.0]
+    config.u_max = [12.0,12.0,12.0]
     config.cfl = 0.45
 
     skin_depth = 5.0
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     config.n0 = 1.0
     config.q0 = omega_p * np.sqrt(config.m0/(config.n0)) # q = sqrt(omega_p^2*m/n)
     v_T = config.u_max[2]/vel_ex*10.0
-    v_0 = config.u_max[2]/2.0
+    v_0 = config.u_max[2]/4.0
 
     noise_A = 2e-6
     noise_f = 0.5*np.pi/spatial_ex
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     print(f"Wave length of maximum growing mode: {2*np.pi/k_m}")
     print(f"Estimated number of cycles: {k_m * spatial_ex}")
 
-    data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
+    data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,0,0,:])
     (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
     e_data = E0z[1][1]
     j_data = J0z[1][1]
@@ -116,7 +116,7 @@ if __name__ == "__main__":
             tile.set_EBJ(E0, B0, J0)
             tile.set_vlv(vlv0, 0)
             tile.DebugBC()
-            data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
+            data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,0,0,:])
             im[0].set_array(data0)
             (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
             e_data = E0z[1][1]
@@ -136,7 +136,7 @@ if __name__ == "__main__":
             tile.CleanUp()
             tile.DebugBC()
 
-        data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,1,1,:])
+        data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,0,0,:])
         im[0].set_array(data0)
         (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
         e_data = E0z[1][1]
