@@ -12,24 +12,24 @@ if __name__ == "__main__":
     config.io_outdir = "two-stream"
     config.tile_partitioning = "hilbert_curve"
     config.n_tiles = [1, 1, 32]
-    config.n_cells_per_tile = [3, 3, 64]
-    config.v_grid_extents = [3,3,2048]
+    config.n_cells_per_tile = [3, 3, 32]
+    config.v_grid_extents = [3,3,1024]
     config.u_max = [8.0,8.0,8.0]
     config.cfl = 0.45
 
-    config.skin_depth = 40.0
+    config.skin_depth = 60.0
 
     config.io_outdir = "rel_test_R_" + str(round(config.skin_depth)) + "_" + str(config.v_grid_extents[2]) + "X" + str(config.n_cells_per_tile[2]*config.n_tiles[2]) #config.io_outdir + "_c_" + str(round(config.cfl)) + "_R_" + str(round(config.skin_depth))
 
     config.omega_p = config.cfl / config.skin_depth
 
-    config.n_laps = 120/ config.omega_p
+    config.n_laps = 180/ config.omega_p
 
     config.field_propagator = "fdtd2"
     config.m0 = 1.0
     config.n0 = 1.0
     config.q0 = config.omega_p * np.sqrt(config.m0/config.n0) # q = sqrt(omega_p^2*m/n)
-    v_T = config.u_max[2]/config.v_grid_extents[2]*10.0
+    v_T = config.u_max[2]/config.v_grid_extents[2]*30.0
     v_0 = config.u_max[2]/6.0
     config.v_T = v_T
     config.v_0 = v_0
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         x.grid_Translate()
         x.grid_CleanUp()
 
-        if simulation.lap % (config.n_laps // 200) == 0:
+        if simulation.lap % (config.n_laps // 400) == 0:
             x.grid_write_vlv_snapshot()
 
         x.grid_add_current()

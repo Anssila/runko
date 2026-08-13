@@ -29,10 +29,12 @@ if __name__ == "__main__":
     config.v_grid_extents = [3,3,vel_ex]
     config.u_max = [12.0,12.0,12.0]
     config.cfl = 0.45
+    v_T = config.u_max[2]/vel_ex*10.0
+    v_0 = config.u_max[2]/4.0
 
-    skin_depth = 5.0
+    skin_depth = 10.0
 
-    omega_p = config.cfl / skin_depth
+    omega_p = config.cfl / skin_depth / np.sqrt(1+v_0**2)
 
     vel_res = config.u_max[2] / (vel_ex-1) * 2.0
 
@@ -40,8 +42,6 @@ if __name__ == "__main__":
     config.m0 = 1.0
     config.n0 = 1.0
     config.q0 = omega_p * np.sqrt(config.m0/(config.n0)) # q = sqrt(omega_p^2*m/n)
-    v_T = config.u_max[2]/vel_ex*10.0
-    v_0 = config.u_max[2]/4.0
 
     noise_A = 2e-6
     noise_f = 0.5*np.pi/spatial_ex

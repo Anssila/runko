@@ -112,14 +112,14 @@ def plot_energy(datas, fig, ax : plt.Axes, names, configs : list[runko.Configura
             fmt = "-."
         elif i > len(datas)//4:
             fmt = "--"
-        ax.plot(x_data * config.omega_p, log_data, fmt, label=names[i])
+        ax.plot(x_data * config.omega_p, log_data, fmt, label="Simulaatio")#names[i]
         if i == 0:
-            ax.plot(x_data * config.omega_p, log_analytic, label=names[i] + "_analytic")
+            ax.plot(x_data * config.omega_p, log_analytic, label="Teoria")#names[i] + "_analytic"
         # ax.semilogy(x_data * config.omega_p, analytic_y, label=names[i] + "_analytic")
 
-    ax.set_title("Sähkökentän keskimääräinen energiatiheys aika-askeleen funktiona")
-    ax.set_xlabel("Aika-askel")
-    ax.set_ylabel("Sähkökentän energia $\\langle \\hat{E}^2 \\rangle / 8\\pi$")
+    ax.set_title("Sähkökentän keskimääräinen energiatiheys ajan funktiona")
+    ax.set_xlabel("Aika ($\\omega_p^{-1}$)")
+    ax.set_ylabel("Sähkökentän energia $\\ln{\\left(\\langle \\hat{E}^2 \\rangle / 8\\pi\\right)}$")
 
 if __name__ == "__main__":
     var = sys.argv[1]
@@ -139,6 +139,9 @@ if __name__ == "__main__":
 
         plot_energy(datas, fig, ax, [name[:name.find("average_E_energy_density")] for name in filenames], configs)
         plt.legend()
+        plt.ylim(-18.0, 10.0)
+        plt.xlim(0.0, 100.0)
+        # plt.savefig("growth_rate.png", dpi=400)
         plt.show()
     elif var == "et":
         filenames = sys.argv[2:]
