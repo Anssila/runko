@@ -13,16 +13,16 @@ auto
   to_ndarray(vlv::DenseGrid &grid)
 {
 
-  const auto grid_shape = std::array { grid.GetMDS().extent(0),
-                                       grid.GetMDS().extent(1),
-                                       grid.GetMDS().extent(2)};
+  const auto grid_shape = std::array { grid.mds().extent(0),
+                                       grid.mds().extent(1),
+                                       grid.mds().extent(2)};
   
 
   auto pygrid = py::array_t<double, py::array::c_style>(grid_shape);
 
   auto pygridv = pygrid.template mutable_unchecked<3>();
   
-  for(const auto mds = grid.GetMDS(); const auto idx: tyvi::sstd::index_space(mds)) {
+  for(const auto mds = grid.mds(); const auto idx: tyvi::sstd::index_space(mds)) {
     const auto [i, j, k] = idx;
     const auto F         = mds[idx][];
 
@@ -62,8 +62,8 @@ void bind_vlv(  py::module& m_sub){
       py::init([](const std::array<std::size_t, 3> tile_grid_indices, const py::handle& h) {
         return vlv::Tile<3, vlv::DenseGrid>(tile_grid_indices, toolbox::ConfigParser(h));
       }))
-    .def("SetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::VDF f, int species) {
-      tile.SetVelGrid( 
+    .def("set_vel_distribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::VDF f, int species) {
+      tile.set_vel_grid( 
         static_cast<runko::index_t>(x + emf::halo_size), 
         static_cast<runko::index_t>(y + emf::halo_size), 
         static_cast<runko::index_t>(z + emf::halo_size), 
@@ -71,16 +71,16 @@ void bind_vlv(  py::module& m_sub){
         static_cast<runko::index_t>(species)
       );
     })
-    .def("GetVelDistribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, int species) {
-        return to_ndarray(dynamic_cast<vlv::DenseGrid&>(tile.GetVelGrid(
+    .def("get_vel_distribution", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, int species) {
+        return to_ndarray(dynamic_cast<vlv::DenseGrid&>(tile.get_vel_grid(
           static_cast<runko::index_t>(x + emf::halo_size),
           static_cast<runko::index_t>(y + emf::halo_size),
           static_cast<runko::index_t>(z + emf::halo_size),
           static_cast<runko::index_t>(species)
         )));
     })
-    .def("DebugAccelerate", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, double ax, double ay, double az) {
-      tile.DebugAccelerate( 
+    .def("debug_accelerate", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, double ax, double ay, double az) {
+      tile.debug_accelerate( 
         static_cast<runko::index_t>(x + emf::halo_size),
         static_cast<runko::index_t>(y + emf::halo_size),
         static_cast<runko::index_t>(z + emf::halo_size),
@@ -88,13 +88,12 @@ void bind_vlv(  py::module& m_sub){
       );
     })
     .def("set_vlv", &vlv::Tile<3, vlv::DenseGrid>::set_vlv)
-    .def("Translate", &vlv::Tile<3, vlv::DenseGrid>::Translate)
+    .def("translate", &vlv::Tile<3, vlv::DenseGrid>::translate)
     .def("accelerate", &vlv::Tile<3, vlv::DenseGrid>::accelerate)
-    .def("CleanUp", &vlv::Tile<3, vlv::DenseGrid>::CleanUp)
-    .def("DebugBC", &vlv::Tile<3, vlv::DenseGrid>::DebugBC)
+    .def("debug_BC", &vlv::Tile<3, vlv::DenseGrid>::debug_BC)
     .def("deposit_current", &vlv::Tile<3, vlv::DenseGrid>::deposit_current)
-    .def("CalculateMoment", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::MCF f, int species) {
-      return tile.CalculateMoment( 
+    .def("calculate_moment", [] (vlv::Tile<3, vlv::DenseGrid>& tile, int x, int y, int z, vlv::Tile<3, vlv::DenseGrid>::MCF f, int species) {
+      return tile.calculate_moment( 
         static_cast<runko::index_t>(x + emf::halo_size), 
         static_cast<runko::index_t>(y + emf::halo_size), 
         static_cast<runko::index_t>(z + emf::halo_size), 
@@ -108,10 +107,6 @@ void bind_vlv(  py::module& m_sub){
     .def("write_vlv_snapshot", &vlv::Tile<3, vlv::DenseGrid>::write_vlv_snapshot)
     .def("get_tot_energy_E", &vlv::Tile<3, vlv::DenseGrid>::get_tot_energy_E)
     .def_static("canonical_type", []() { return py::type::of<vlv::Tile<3, DenseGrid>>(); })
-    .def_static("virtual_tile_specialization", []() { return py::type::of<vlv::Tile<3, DenseGrid>>(); });;
-
-
-//   m_3d.def("_write_average_kinetic_energy", &pic::write_average_kinetic_energy);
-
+    .def_static("virtual_tile_specialization", []() { return py::type::of<vlv::Tile<3, DenseGrid>>(); });
 }
 } // namespace vlv

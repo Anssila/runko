@@ -50,9 +50,9 @@ class vlv_tile_accelerate(unittest.TestCase):
 
         v_init = lambda x, y, z : maxwell_distr(x,y,z, v_0)
         for x_,y_,z_ in itertools.product(range(config.n_cells_per_tile[0]), range(config.n_cells_per_tile[1]), range(config.n_cells_per_tile[2])):
-            tile.SetVelDistribution(x_,y_,z_, v_init,0)
+            tile.set_vel_distribution(x_,y_,z_, v_init,0)
         n_lambda = lambda x, y, z, gamma : 1.0
-        moment0 = tile.CalculateMoment(1,1,1,n_lambda,0)
+        moment0 = tile.calculate_moment(1,1,1,n_lambda,0)
 
         # Make sure that the fluid is initialized correctly
         self.assertAlmostEqual(moment0, 1.0, 1)

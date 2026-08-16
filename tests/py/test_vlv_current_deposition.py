@@ -47,13 +47,13 @@ class vlv_tile_current_deposition(unittest.TestCase):
             return 1.0/(4.0*np.pi*theta*kn(2,1.0/theta))*np.exp(-np.sqrt(1.0+vx**2+vy**2+vz**2)/theta)/m**3
 
         v_init = lambda x, y, z : maxwell_juttner(x,y,z, theta, m)
-        tile.SetVelDistribution(1,1,1, v_init,0)
-        grid = tile.GetVelDistribution(1,1,1,0)
+        tile.set_vel_distribution(1,1,1, v_init,0)
+        grid = tile.get_vel_distribution(1,1,1,0)
         tot = sum(sum(sum(grid))) * dU**3
 
         # Test that number density is calculated correctly
         n_lambda = lambda x, y, z, gamma : 1.0
-        moment0 = tile.CalculateMoment(1,1,1,n_lambda,0)
+        moment0 = tile.calculate_moment(1,1,1,n_lambda,0)
         self.assertAlmostEqual(tot/moment0, 1.0, 5)
 
         # Create tile in a way to have a good distribution for temperature calculation
@@ -61,32 +61,32 @@ class vlv_tile_current_deposition(unittest.TestCase):
         config.u_res = None
         config.v_grid_extents = [50,50,50]
         tile = create_tile(config)
-        tile.SetVelDistribution(1,1,1,v_init,0)
-        moment0_0 = tile.CalculateMoment(1,1,1,n_lambda,0)
+        tile.set_vel_distribution(1,1,1,v_init,0)
+        moment0_0 = tile.calculate_moment(1,1,1,n_lambda,0)
 
         # Test that the bulk velocity is zero in all directions
         vx_lambda = lambda x, y, z, gamma : x
         vy_lambda = lambda x, y, z, gamma : y
         vz_lambda = lambda x, y, z, gamma : z
-        moment1x = tile.CalculateMoment(1,1,1,vx_lambda,0)
-        moment1y = tile.CalculateMoment(1,1,1,vy_lambda,0)
-        moment1z = tile.CalculateMoment(1,1,1,vz_lambda,0)
+        moment1x = tile.calculate_moment(1,1,1,vx_lambda,0)
+        moment1y = tile.calculate_moment(1,1,1,vy_lambda,0)
+        moment1z = tile.calculate_moment(1,1,1,vz_lambda,0)
         self.assertAlmostEqual(moment1x, 0.0, 1)
         self.assertAlmostEqual(moment1y, 0.0, 1)
         self.assertAlmostEqual(moment1z, 0.0, 1)
 
         # Test (non-relativistic) temperature calculation using bulk velocity
         t_lambda = lambda x, y, z, gamma : ((x-moment1x)**2 + (y-moment1y)**2 + (z-moment1z)**2)
-        temperature = tile.CalculateMoment(1,1,1,t_lambda,0) * m / (3*moment0_0*k_B)
+        temperature = tile.calculate_moment(1,1,1,t_lambda,0) * m / (3*moment0_0*k_B)
         self.assertAlmostEqual(temperature, T, 0)
 
         # Test that bulk velocity is non-zero after acceleration
-        tile.DebugAccelerate(1,1,1, 5.0, -2.0, 7.0)
-        moment0 = tile.CalculateMoment(1,1,1,n_lambda,0)
+        tile.debug_accelerate(1,1,1, 5.0, -2.0, 7.0)
+        moment0 = tile.calculate_moment(1,1,1,n_lambda,0)
         self.assertAlmostEqual(moment0_0/moment0, 1.0, 5)
-        moment1x = tile.CalculateMoment(1,1,1,vx_lambda,0)
-        moment1y = tile.CalculateMoment(1,1,1,vy_lambda,0)
-        moment1z = tile.CalculateMoment(1,1,1,vz_lambda,0)
+        moment1x = tile.calculate_moment(1,1,1,vx_lambda,0)
+        moment1y = tile.calculate_moment(1,1,1,vy_lambda,0)
+        moment1z = tile.calculate_moment(1,1,1,vz_lambda,0)
 
         self.assertAlmostEqual(moment1x, 5.0,2)
         self.assertAlmostEqual(moment1y, -2.0,2)
@@ -112,11 +112,11 @@ class vlv_tile_current_deposition(unittest.TestCase):
             return (np.pi*v_0**2)**(-1.5) * np.exp(-(vx**2+vy**2+vz**2)/v_0**2)
 
         v_init = lambda x, y, z : maxwell_distr(x,y,z, v_0)
-        tile.SetVelDistribution(1,1,1, v_init,0)
-        tile.SetVelDistribution(1,1,1, v_init,1)
+        tile.set_vel_distribution(1,1,1, v_init,0)
+        tile.set_vel_distribution(1,1,1, v_init,1)
         n_lambda = lambda x, y, z, gamma : 1.0
-        moment0 = tile.CalculateMoment(1,1,1,n_lambda,0)
-        moment1 = tile.CalculateMoment(1,1,1,n_lambda,1)
+        moment0 = tile.calculate_moment(1,1,1,n_lambda,0)
+        moment1 = tile.calculate_moment(1,1,1,n_lambda,1)
 
         # Make sure that the fluid is initialized correctly
         self.assertAlmostEqual(moment0, 1.0,5)
@@ -151,7 +151,7 @@ class vlv_tile_current_deposition(unittest.TestCase):
         self.assertAlmostEqual(E0y[1][1][1], 0.0)
         self.assertAlmostEqual(E0z[1][1][1], 0.0)
 
-        tile.DebugAccelerate(1,1,1,v_0, -2*v_0, 1.5*v_0)
+        tile.debug_accelerate(1,1,1,v_0, -2*v_0, 1.5*v_0)
         tile.deposit_current()
         tile.add_current()
 

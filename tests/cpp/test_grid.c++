@@ -126,62 +126,113 @@ const suite<"dense grid testing"> s2 = [] {
     g.set_u_res({0.1f,0.1f,0.1f});
     // Test zero initialization
 
-    g.InitZero();
-    expect(g.DebugGetTotalFluid() == 0.0f);
+    g.init_zero();
+    expect(g.debug_get_total_fluid() == 0.0f);
 
     // Test delta initialization
     std::array<vlv::VlasovGrid::value_type,3> v = {0.0f, 0.1f, -0.1f};
-    auto inds = g.GetIndFromVel(v);
-    g.InitDelta(v);
-    expect(g.DebugGetTotalFluid() == 1.0f) << "Expected 1, got " << g.DebugGetTotalFluid();
-    expect(g.DebugGetFluid(inds) == 1.0f) << "Expected 1, got " << g.DebugGetFluid(inds);
+    auto inds = g.get_inds_from_vel(v);
+    g.init_delta(v);
+    expect(g.debug_get_total_fluid() == 1.0f) << "Expected 1, got " << g.debug_get_total_fluid();
+    expect(g.debug_get_fluid(inds) == 1.0f) << "Expected 1, got " << g.debug_get_fluid(inds);
   };
 
-  "shift"_test = [] {
+  "accelerate"_test = [] {
     auto g = vlv::DenseGrid(5,5,5);
     g.set_u_res({0.1f,0.1f,0.1f});
-
+    const auto w = tyvi::mdgrid_work{};
     // First test that zero fluid stays as zero
-    g.InitZero(); 
-    g.Shift(0.1f,0.2f,0.3f);
-    expect(std::abs(static_cast<float>(g.DebugGetTotalFluid())) < tolerance) << "Expected 0, got " << g.DebugGetTotalFluid();
+    g.init_zero(); 
+    g.accelerate(w, 0.1f, 0);
+    g.clean_up();
+    g.accelerate(w, 0.2f, 0);
+    g.clean_up();
+    g.accelerate(w, 0.3f, 0);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(g.debug_get_total_fluid())) < tolerance) << "Expected 0, got " << g.debug_get_total_fluid();
 
-    // Test that a delta distribution conserves fluid under shifting
-    g.InitDelta({0.1f,-0.1f,0.2f});
-    vlv::VlasovGrid::value_type tot = g.DebugGetTotalFluid();
+    // Test that a delta distribution conserves fluid under acceleration
+    g.init_delta({0.1f,-0.1f,0.2f});
+    vlv::VlasovGrid::value_type tot = g.debug_get_total_fluid();
     expect(tot == 1.0f);
-    g.Shift(0.0f, 0.0f, 0.0f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(0.05f, 0.0f, 0.0f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(-0.1f, 0.0f, 0.0f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(0.05f, 0.05f, 0.05f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(1.05f, 1.05f, 1.05f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({4,4,4}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({4,4,4});
-    g.Shift(-0.2f,-0.2f,-0.2f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({2,2,2}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({2,2,2});
-    g.Shift(-2.0f, -2.0f, -2.0f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    expect(std::abs(static_cast<float>(tot - g.DebugGetFluid({0,0,0}))) < tolerance) << "Expected " << tot << ", got " << g.DebugGetFluid({0,0,0});
+    g.accelerate(w, 0.0f, 0);
+    g.clean_up();
+    g.accelerate(w, 0.0f, 1);
+    g.clean_up();
+    g.accelerate(w, 0.0f, 2);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    g.accelerate(w, 0.05f, 0);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    g.accelerate(w, -0.1f, 0);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    g.accelerate(w, 0.05f, 0);
+    g.clean_up();
+    g.accelerate(w, 0.05f, 1);
+    g.clean_up();
+    g.accelerate(w, 0.05f, 2);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    g.accelerate(w, 1.05f, 0);
+    g.clean_up();
+    g.accelerate(w, 1.05f, 1);
+    g.clean_up();
+    g.accelerate(w, 1.05f, 2);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_fluid({4,4,4}))) < tolerance) << "Expected " << tot << ", got " << g.debug_get_fluid({4,4,4});
+    g.accelerate(w, -0.2f, 0);
+    g.clean_up();
+    g.accelerate(w, -0.2f, 1);
+    g.clean_up();
+    g.accelerate(w, -0.2f, 2);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_fluid({2,2,2}))) < tolerance) << "Expected " << tot << ", got " << g.debug_get_fluid({2,2,2});
+    g.accelerate(w, -2.0f, 0);
+    g.clean_up();
+    g.accelerate(w, -2.0f, 1);
+    g.clean_up();
+    g.accelerate(w, -2.0f, 2);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_fluid({0,0,0}))) < tolerance) << "Expected " << tot << ", got " << g.debug_get_fluid({0,0,0});
 
-
-    g.InitDelta({0.0f,0.0f,0.0f});
-    g.Shift(0.03f,-0.01f,0.18f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(-0.03f,0.01f,-0.18f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(0.09f,-0.21f,3.1455f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
-    g.Shift(0.03f,0.37f,0.0f);
-    expect(std::abs(static_cast<float>(tot - g.DebugGetTotalFluid())) < tolerance) << "Expected " << tot << ", got " << g.DebugGetTotalFluid();
+    g.init_delta({0.0f,0.0f,0.0f});
+    g.accelerate(w, 0.03f, 0);
+    g.clean_up();
+    g.accelerate(w,-0.01f, 1);
+    g.clean_up();
+    g.accelerate(w, 0.18f, 2);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    g.accelerate(w,-0.03f, 0);
+    g.clean_up();
+    g.accelerate(w, 0.01f, 1);
+    g.clean_up();
+    g.accelerate(w,-0.18f, 2);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    g.accelerate(w, 0.09f,   0);
+    g.clean_up();
+    g.accelerate(w,-0.21f,   1);
+    g.clean_up();
+    g.accelerate(w, 3.1455f, 2);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
+    g.accelerate(w, 0.03f, 0);
+    g.clean_up();
+    g.accelerate(w, 0.37f, 1);
+    g.clean_up();
+    g.accelerate(w, 0.0f, 2);
+    g.clean_up();
+    expect(std::abs(static_cast<float>(tot - g.debug_get_total_fluid())) < tolerance) << "Expected " << tot << ", got " << g.debug_get_total_fluid();
 
   };
 
-  "GetVelFromIndex"_test = [] {
+  "get_vel_from_inds"_test = [] {
     auto g = vlv::DenseGrid(5,6,7);
     g.set_u_max({2.0f,2.0f,2.0f});
 
@@ -191,22 +242,22 @@ const suite<"dense grid testing"> s2 = [] {
         expect(std::abs(static_cast<float>(a[2]-b[2])) < tolerance) << "Expected " << b[2] << ", got " << a[2];
     };
 
-    approxEq(g.GetVelFromInd({0,0,0}),{-2.0f,-2.0f,-2.0f});
+    approxEq(g.get_vel_from_inds({0,0,0}),{-2.0f,-2.0f,-2.0f});
 
-    approxEq(g.GetVelFromInd({4,5,6}),{2.0f,2.0f,2.0f});
+    approxEq(g.get_vel_from_inds({4,5,6}),{2.0f,2.0f,2.0f});
 
-    approxEq(g.GetVelFromInd({2,2,3}),{0.0f,-0.4f,0.0f});
+    approxEq(g.get_vel_from_inds({2,2,3}),{0.0f,-0.4f,0.0f});
   };
 
-  "GetIndexFromVel"_test = [] {
+  "get_inds_from_vel"_test = [] {
     auto g = vlv::DenseGrid(5,6,7);
     g.set_u_res({0.1f,0.1f,0.1f});
 
-    expect(g.GetIndFromVel({-0.2f,-0.25f,-0.3f}) == std::array<runko::index_t,3>{0,0,0});
+    expect(g.get_inds_from_vel({-0.2f,-0.25f,-0.3f}) == std::array<runko::index_t,3>{0,0,0});
 
-    expect(g.GetIndFromVel({0.2f,0.25f,0.3f}) == std::array<runko::index_t,3>{4,5,6});
+    expect(g.get_inds_from_vel({0.2f,0.25f,0.3f}) == std::array<runko::index_t,3>{4,5,6});
 
-    expect(g.GetIndFromVel({0.0f,0.0f,0.0f}) == std::array<runko::index_t,3>{2,2,3});
+    expect(g.get_inds_from_vel({0.0f,0.0f,0.0f}) == std::array<runko::index_t,3>{2,2,3});
   };
 
   "odd_index"_test = [] {
@@ -220,8 +271,8 @@ const suite<"dense grid testing"> s2 = [] {
         {1,2,3}
     };
     for (auto inds : test_inds){ 
-        auto v = g.GetVelFromInd(inds);
-        auto t = g.GetIndFromVel(v);
+        auto v = g.get_vel_from_inds(inds);
+        auto t = g.get_inds_from_vel(v);
         expect(t == inds) << "Expected {" 
                           << inds[0] << ","
                           << inds[1] << ","
@@ -248,7 +299,7 @@ const suite<"dense grid testing"> s2 = [] {
     };
 
     for (auto vel : test_vels){
-        approxEq(g.GetVelFromInd(g.GetIndFromVel(vel)),vel);
+        approxEq(g.get_vel_from_inds(g.get_inds_from_vel(vel)),vel);
     }
 
   };
@@ -265,8 +316,8 @@ const suite<"dense grid testing"> s2 = [] {
         {1,2,3}
     };
     for (auto inds : test_inds){ 
-        auto v = g.GetVelFromInd(inds);
-        auto t = g.GetIndFromVel(v);
+        auto v = g.get_vel_from_inds(inds);
+        auto t = g.get_inds_from_vel(v);
         expect(t == inds) << "Expected {" 
                           << inds[0] << ","
                           << inds[1] << ","
@@ -293,7 +344,7 @@ const suite<"dense grid testing"> s2 = [] {
     };
 
     for (auto vel : test_vels){
-        approxEq(g.GetVelFromInd(g.GetIndFromVel(vel)),vel);
+        approxEq(g.get_vel_from_inds(g.get_inds_from_vel(vel)),vel);
     }
 
   };
@@ -303,8 +354,8 @@ const suite<"dense grid testing"> s2 = [] {
     for (int i = 0; i < 3; i++){
         grids.emplace_back(5,5,5);
         grids[i].set_u_res({0.1f,0.1f,0.1f});
-        grids[i].InitDelta({0.2f,-0.1f,0.1f});
-        vlv::VlasovGrid::value_type tot = grids[i].DebugGetTotalFluid();
+        grids[i].init_delta({0.2f,-0.1f,0.1f});
+        vlv::VlasovGrid::value_type tot = grids[i].debug_get_total_fluid();
         expect(tot == 1.0f) << "Expected 1.0, got " << tot;  
     }
     auto neighbors = std::vector<vlv::VlasovGrid*>{
@@ -313,18 +364,19 @@ const suite<"dense grid testing"> s2 = [] {
         static_cast<vlv::VlasovGrid*>(&grids[2])
     };
 
-    // Test that fluid is moved from one grid to the other
+    const auto w = tyvi::mdgrid_work{};
 
-    grids[1].TranslateZ(neighbors, 1.0f);
-    grids[1].Clean();
-    grids[0].Clean();
-    grids[2].Clean();
-    auto tot1 = grids[0].DebugGetTotalFluid();
+    // Test that fluid is moved from one grid to the other
+    grids[1].translate(w, neighbors, 1.0f, 0);
+    grids[1].clean_up();
+    grids[0].clean_up();
+    grids[2].clean_up();
+    auto tot1 = grids[0].debug_get_total_fluid();
     expect(tot1 == 0.0f) << "Expected 0.0, got " << tot1;
-    auto tot2 = grids[1].DebugGetTotalFluid();
+    auto tot2 = grids[1].debug_get_total_fluid();
     expect(tot2 < 1.0f) << "Expected < 1.0, got " << tot2;
     expect(tot2 > 0.0f) << "Expected > 0.0, got " << tot2;
-    auto tot3 = grids[2].DebugGetTotalFluid();
+    auto tot3 = grids[2].debug_get_total_fluid();
     expect(tot3 < 1.0f) << "Expected < 1.0, got " << tot3;
     expect(tot3 > 0.0f) << "Expected > 0.0, got " << tot3;
 
@@ -332,30 +384,29 @@ const suite<"dense grid testing"> s2 = [] {
 
     // Test that fluid is conserved when moving around
 
-    grids[0].InitDelta({0.1f,0.1f,-0.1f});
-    grids[1].InitDelta({0.1f,0.1f,-0.1f});
-    grids[2].InitDelta({0.1f,0.1f,-0.1f});
+    grids[0].init_delta({0.1f,0.1f,-0.1f});
+    grids[1].init_delta({0.1f,0.1f,-0.1f});
+    grids[2].init_delta({0.1f,0.1f,-0.1f});
 
-    tot1 = grids[0].DebugGetTotalFluid();
-    tot2 = grids[1].DebugGetTotalFluid();
-    tot3 = grids[2].DebugGetTotalFluid();
+    tot1 = grids[0].debug_get_total_fluid();
+    tot2 = grids[1].debug_get_total_fluid();
+    tot3 = grids[2].debug_get_total_fluid();
 
     expect(tot1+tot2+tot3 == 3.0) << "Expected total to be 3.0, got " << tot1+tot2+tot3 << " from: " << tot1 << " + " << tot2 << " + " << tot3; 
 
 
-
     // Use periodic boundary conditions
-    grids[0].TranslateZ({neighbors[2],neighbors[0],neighbors[1]},1.0f);
-    grids[1].TranslateZ({neighbors[0],neighbors[1],neighbors[2]},1.0f);
-    grids[2].TranslateZ({neighbors[1],neighbors[2],neighbors[0]},1.0f);
+    grids[0].translate(w,{neighbors[2],neighbors[0],neighbors[1]},1.0f, 0);
+    grids[1].translate(w,{neighbors[0],neighbors[1],neighbors[2]},1.0f, 0);
+    grids[2].translate(w,{neighbors[1],neighbors[2],neighbors[0]},1.0f, 0);
 
-    grids[0].Clean();
-    grids[1].Clean();
-    grids[2].Clean();
+    grids[0].clean_up();
+    grids[1].clean_up();
+    grids[2].clean_up();
 
-    tot1 = grids[0].DebugGetTotalFluid();
-    tot2 = grids[1].DebugGetTotalFluid();
-    tot3 = grids[2].DebugGetTotalFluid();
+    tot1 = grids[0].debug_get_total_fluid();
+    tot2 = grids[1].debug_get_total_fluid();
+    tot3 = grids[2].debug_get_total_fluid();
 
     expect(tot1+tot2+tot3 == 3.0) << "Expected total to be 3.0, got " << tot1+tot2+tot3 << " from: " << tot1 << " + " << tot2 << " + " << tot3; 
 
@@ -400,9 +451,9 @@ const suite<"dense grid testing"> s2 = [] {
     for (uint i = 0; i < 5; i++)
     for (uint j = 0; j < 5; j++)
     for (uint k = 0; k < 5; k++){
-        auto val1 = grids[0].DebugGetFluid({i,j,k});
-        auto val2 = grids[1].DebugGetFluid({i,j,k});
-        auto val3 = grids[2].DebugGetFluid({i,j,k});
+        auto val1 = grids[0].debug_get_fluid({i,j,k});
+        auto val2 = grids[1].debug_get_fluid({i,j,k});
+        auto val3 = grids[2].debug_get_fluid({i,j,k});
         expect(val1 == correct[i][j][k]) << "Expected " << correct[i][j][k] << ", got " << val1 << " for grid 1 and indices {" << i << ", " << j << ", " << k << "}";
         expect(val2 == correct[i][j][k]) << "Expected " << correct[i][j][k] << ", got " << val2 << " for grid 2 and indices {" << i << ", " << j << ", " << k << "}";
         expect(val3 == correct[i][j][k]) << "Expected " << correct[i][j][k] << ", got " << val3 << " for grid 3 and indices {" << i << ", " << j << ", " << k << "}";
@@ -412,8 +463,8 @@ const suite<"dense grid testing"> s2 = [] {
   "moment"_test = [] {
     auto g = vlv::DenseGrid(5,5,5);
     g.set_u_res({0.1f,0.1f,0.1f});
-    g.InitDelta({0.0f,0.0f,0.1f});
-    expect(g.DebugGetTotalFluid() == 1.0f);
+    g.init_delta({0.0f,0.0f,0.1f});
+    expect(g.debug_get_total_fluid() == 1.0f);
     const auto w = tyvi::mdgrid_work{};
     const auto n = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma){
         return 1.0f;
@@ -423,19 +474,19 @@ const suite<"dense grid testing"> s2 = [] {
         expect(std::abs(static_cast<float>(a-b)) < 1e-8) << "Expected " << std::setprecision(10) << b << ", got " << a;
     };
 
-    approxEq(g.CalculateMoment(w, n), 0.001f);
+    approxEq(g.calculate_moment(w, n), 0.001f);
     const auto u = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma){
         return std::sqrt(x*x+y*y+z*z);
     };
 
-    approxEq(g.CalculateMoment(w, u), 0.0001f);
+    approxEq(g.calculate_moment(w, u), 0.0001f);
 
     const auto v = [] ([[maybe_unused]] double x, [[maybe_unused]] double y, [[maybe_unused]] double z, [[maybe_unused]] double gamma){
         return std::sqrt(x*x+y*y+z*z) / gamma;
     };
 
-    expect(g.CalculateMoment(w,v) < 0.0001f) << "Expected < 0.0001, got " << g.CalculateMoment(w,v);
-    expect(g.CalculateMoment(w,v) >= 0.00005f) << "Expected > 0.00005, got " << g.CalculateMoment(w,v);
+    expect(g.calculate_moment(w,v) < 0.0001f) << "Expected < 0.0001, got " << g.calculate_moment(w,v);
+    expect(g.calculate_moment(w,v) >= 0.00005f) << "Expected > 0.00005, got " << g.calculate_moment(w,v);
   };
 };
 
