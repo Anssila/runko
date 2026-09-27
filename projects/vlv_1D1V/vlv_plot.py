@@ -11,18 +11,17 @@ def read_snapshot(filename : str, species = 0):
         raise IndexError(f"Species {species} out of range of {n_species} species provided!")
     size = np.fromfile(filename, dtype=np.int64, count=1, offset=8)[0]
     extents = np.fromfile(filename, dtype=np.int64, count=6, offset=16)
-    data = np.fromfile(filename, dtype=np.float32, count=size, offset=40 + species * (size * 4+32)).reshape(extents)
+    data = np.fromfile(filename, dtype=np.float32, count=size, offset=64 + species * (size * 4+32)).reshape(extents)
     return data
 
 if __name__ == "__main__":
-    n_tiles = 32
     fig, ax = plt.subplots()
     datas = []
     filepath = sys.argv[1]
     n_laps = 0
 
 
-    ax.set_xlabel("Paikka")
+    ax.set_xlabel("Paikka ($d_s$)")
     ax.set_ylabel("Itseisnopeus (c)")
     ax.set_title("1D1V faasiavaruuden lukumäärätiheys")
     config = None
@@ -33,6 +32,7 @@ if __name__ == "__main__":
     except:
         print("Failed to open config file!")
     spatial_ex = config.n_tiles[2] * config.n_cells_per_tile[2]
+    n_tiles = config.n_tiles[2]
     while True:
         try:
             with open(f"{filepath}/vlv_snapshot(0,0,0)_{n_laps}.bin") as f:
@@ -57,8 +57,9 @@ if __name__ == "__main__":
         data = read_snapshot(f"{filepath}/vlv_snapshot(0,0,{i})_{min}.bin")[0,0,:,0,0,:]
         datas.append(data)
     full_data = np.rot90(np.concatenate(datas, axis=0))
-    norm = colors.SymLogNorm(vmin=0, vmax=np.max(full_data), linthresh=1e-6)
-    im = ax.imshow(full_data, norm= norm, aspect='auto', cmap="plasma", extent=[-spatial_ex//2,spatial_ex//2,-config.u_max[2],config.u_max[2]])
+    norm = colors.SymLogNorm(vmin=0, vmax=np.max(full_data), linthresh=1e-4)
+    x_ex = spatial_ex / config.skin_depth
+    im = ax.imshow(full_data, norm= norm, aspect='auto', cmap="plasma", extent=[-x_ex/2, x_ex/2,-config.u_max[2],config.u_max[2]])
 
     def update(frame):
         datas = []
@@ -68,8 +69,9 @@ if __name__ == "__main__":
         full_data = np.rot90(np.concatenate(datas, axis=0))
         im.set_data(full_data)
 
-    ani = animation.FuncAnimation(fig, update, frames=max-min, interval=100)
+    ani = animation.FuncAnimation(fig, update, frames=list(range(max-min))[::2], interval=50)
     fig.colorbar(im, ax =ax, label="Lukumäärätiheys")
+    fig.set_size_inches(10.0, 5.0)
     plt.show()
-    # ani.save(f"{filepath}/anim.gif", writer="pillow", dpi=400)
-    ani.save(f"{filepath}/{min}.png", writer="pillow", dpi=400)
+    # ani.save(f"{filepath}/anim2.gif", writer="pillow", dpi=400)
+    # ani.save(f"{filepath}/{min}.png", writer="pillow", dpi=400)

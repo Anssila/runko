@@ -75,7 +75,7 @@ def plot_in_time(datas, fig, ax):
                  ax=ax,
                  orientation=None)
 
-def plot_energy(datas, fig, ax : plt.Axes, names, configs : list[runko.Configuration]):
+def plot_energy(datas, fig, ax : plt.Axes, names, configs : list[runko.Configuration], lims : list):
     for i in range(len(datas)):
         config = configs[i]
         data = datas[i]
@@ -91,20 +91,25 @@ def plot_energy(datas, fig, ax : plt.Axes, names, configs : list[runko.Configura
         x_data = np.array(x_data)
         y_data = np.array(y_data)
         # ax.semilogy(x_data * config.omega_p, y_data, label=names[i])
-        mults = [0.00008, 0.0002]
         analytic_y = y_data[0] * np.exp(x_data * gamma_m)
 
         log_data = np.log(y_data)
         log_analytic = np.log(analytic_y)
+        # index = len(x_data)//2
+        normal_t = 110.0
+        index = 0
+        for j in range(len(x_data)):
+            if x_data[j] >= normal_t/config.omega_p:
+                index = j
+                break
+        t1 = normal_t - x_data[index] * config.omega_p
+        t0 = x_data[index-1] * config.omega_p - normal_t
+        log_data -= t0/(t1+t0) * log_data[index] + t1/(t1+t0) * log_data[index-1]
+        log_analytic -=  t0/(t1+t0) * log_analytic[index] + t1/(t1+t0) * log_analytic[index-1]
 
-        index = len(x_data)//2
-        # for j in range(len(x_data)):
-        #     if x_data[j] >= 100.0/config.omega_p:
-        #         index = j
-        #         break
+        lims[0] = min(lims[0], np.min(log_data))
+        lims[1] = max(lims[1], np.max(log_data))
 
-        log_data -= log_data[index]
-        log_analytic -= log_analytic[index]
         fmt = "-"
         if i > 3*len(datas)//4:
             fmt = ":"
@@ -112,9 +117,9 @@ def plot_energy(datas, fig, ax : plt.Axes, names, configs : list[runko.Configura
             fmt = "-."
         elif i > len(datas)//4:
             fmt = "--"
-        ax.plot(x_data * config.omega_p, log_data, fmt, label="Simulaatio")#names[i]
-        if i == 0:
-            ax.plot(x_data * config.omega_p, log_analytic, label="Teoria")#names[i] + "_analytic"
+        ax.plot(x_data * config.omega_p, log_data, fmt, label=f"Simulaatio_{names[i]}")#
+        # if i == 0:
+        ax.plot(x_data * config.omega_p, log_analytic, label=f"Teoria_{names[i]}")#names[i] + "_analytic"
         # ax.semilogy(x_data * config.omega_p, analytic_y, label=names[i] + "_analytic")
 
     ax.set_title("Sähkökentän keskimääräinen energiatiheys ajan funktiona")
@@ -136,11 +141,13 @@ if __name__ == "__main__":
                     configs.append(pickle.load(file))
             except:
                 print("Failed to open config file!")
+        lims = [100.0, -100.0]
 
-        plot_energy(datas, fig, ax, [name[:name.find("average_E_energy_density")] for name in filenames], configs)
+        plot_energy(datas, fig, ax, [name[:name.find("average_E_energy_density")] for name in filenames], configs, lims)
         plt.legend()
-        plt.ylim(-18.0, 10.0)
-        plt.xlim(0.0, 100.0)
+        margin = (lims[1] - lims[0]) * 0.05
+        plt.ylim(lims[0] - margin, lims[1] + margin)
+        # plt.xlim(0.0, 100.0)
         # plt.savefig("growth_rate.png", dpi=400)
         plt.show()
     elif var == "et":

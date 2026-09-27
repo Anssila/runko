@@ -37,13 +37,18 @@ if __name__ == "__main__":
     im = ax.plot(x_data, datas[0])[0]
     ax.set_xlabel("Paikka ($d_s$)")
     ax.set_ylabel("Sähkökentän energia $\\langle \\hat{E}^2 \\rangle / 8\\pi$")
-
-    mins = [min(datas[0])]
-    maxs = [max(datas[0])]
+    ax.grid()
+    mins = [min(datas[0]) * 1.5]
+    maxs = [max(datas[0]) * 1.5]
 
     def update(frame):
-        mins.append(min(datas[frame]) * 1.5)
-        maxs.append(max(datas[frame]) * 1.5)
+        global mins, maxs
+        if frame == 0:
+            mins = [min(datas[0]) * 1.5]
+            maxs = [max(datas[0]) * 1.5]
+        else:
+            mins.append(min(datas[frame]) * 1.5)
+            maxs.append(max(datas[frame]) * 1.5)
         if len(mins) > 10:
                     mins.pop(0)
                     maxs.pop(0)

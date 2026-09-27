@@ -29,12 +29,22 @@ if __name__ == "__main__":
     config.v_grid_extents = [3,3,vel_ex]
     config.u_max = [12.0,12.0,12.0]
     config.cfl = 0.45
-    v_T = config.u_max[2]/vel_ex*10.0
+    v_T = config.u_max[2]/vel_ex*5.0
     v_0 = config.u_max[2]/4.0
 
     skin_depth = 10.0
 
-    omega_p = config.cfl / skin_depth / np.sqrt(1+v_0**2)
+    gamma_b = np.sqrt(1 + v_0**2)
+    omega_p = config.cfl / skin_depth
+    gamma_m = omega_p * gamma_b**-1.5 # calculate maximum growth rate
+    k_m = np.sqrt(3)/2*omega_p / v_0 / config.cfl * gamma_b**-0.5# calculate wave number for the maximally growing mode
+
+    print(f"Plasma freq: {omega_p}")
+    print(f"Maximum growth rate: {gamma_m}")
+    print(f"Beam gamma factor: {gamma_b}")
+    print(f"Wave length of maximum growing mode: {2*np.pi/k_m}")
+    n_cycles = k_m * spatial_ex / (2*np.pi)
+    print(f"Estimated number of cycles: {n_cycles}")
 
     vel_res = config.u_max[2] / (vel_ex-1) * 2.0
 
@@ -44,9 +54,9 @@ if __name__ == "__main__":
     config.q0 = omega_p * np.sqrt(config.m0/(config.n0)) # q = sqrt(omega_p^2*m/n)
 
     noise_A = 2e-6
-    noise_f = 0.5*np.pi/spatial_ex
+    noise_f = round(n_cycles) * 2.0*np.pi/spatial_ex
 
-    E0 = lambda x, y, z: (0, 0, np.sin(noise_f*z) % noise_A - 0.5 * noise_A)
+    E0 = lambda x, y, z: (0, 0, np.sin(noise_f*z)*noise_A) #np.sin(noise_f*z) % noise_A - 0.5 * noise_A)
     B0 = lambda x, y, z: (0, 0, 0)
     J0 = lambda x, y, z: (0, 0, 0)
 
@@ -74,16 +84,9 @@ if __name__ == "__main__":
     tile.set_vlv(vlv0, 0)
     tile.DebugBC()
     # omega_p = np.sqrt(config.cfl * config.q0**2/config.m0*avg_n) # calculate plasma frequency using avg_n
-    gamma_b = np.sqrt(1 + v_0**2)
-    gamma_m = omega_p * gamma_b**-1.5 # calculate maximum growth rate
-    k_m = np.sqrt(3)/4*omega_p / v_0 / config.cfl# calculate wave number for the maximally growing mode (/4 because we have symmetrical beams)
 
     energy_0 = 0.0
 
-    print(f"Plasma freq: {omega_p}")
-    print(f"Maximum growth rate: {gamma_m}")
-    print(f"Wave length of maximum growing mode: {2*np.pi/k_m}")
-    print(f"Estimated number of cycles: {k_m * spatial_ex}")
 
     data0 = np.rot90(tile.get_vlv_snapshot(0)[0,0,:,0,0,:])
     (E0x, E0y, E0z), (B0x, B0y, B0z), (J0x, J0y, J0z) = tile.get_EBJ()
@@ -162,6 +165,8 @@ if __name__ == "__main__":
         ani.save(filename=filename, writer="pillow")
     y_data, x_data = zip(*totE)
     plt.plot(x_data, y_data, label="simulation")
+    mult = y_data[len(y_data)//2] / analytic_y[len(y_data)//2]
+    analytic_y = np.array(analytic_y) * (np.ones(len(y_data)) * mult)
     plt.plot(x_data, analytic_y, label="theory")
     plt.yscale("log")
     plt.xlabel("Aika ($\\omega_p^{-1}$)")
