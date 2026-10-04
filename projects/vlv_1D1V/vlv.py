@@ -11,23 +11,24 @@ if __name__ == "__main__":
     config = runko.Configuration(None)
     config.io_outdir = "two-stream"
     config.tile_partitioning = "hilbert_curve"
-    config.n_tiles = [1, 1, 128]
-    config.n_cells_per_tile = [3, 3, 80]
-    config.v_grid_extents = [3,3,1024]
+    config.n_tiles = [1, 1, 32]
+    config.n_cells_per_tile = [3, 3, 32]
+    config.v_grid_extents = [3,3,512]
     config.u_max = [18.0,18.0,18.0]
-    config.cfl = 0.45
+    config.cfl = 0.90
 
-    config.skin_depth = 28.810122
+    config.skin_depth = 28.810122 / 3.0
 
-    config.io_outdir = "rel_test_C_" + str(round(config.cfl*100)) + "_R_" + str(round(config.skin_depth)) + "_" + str(config.v_grid_extents[2]) + "X" + str(config.n_cells_per_tile[2]*config.n_tiles[2]) #config.io_outdir + "_c_" + str(round(config.cfl)) + "_R_" + str(round(config.skin_depth))
+    config.n0 = 1.0
+    config.m0 = 1.0
+    config.io_outdir = "simulations/long_sim"
+    #"simulations/rel_test_C_" + str(round(config.cfl*100)) + "_R_" + str(round(config.skin_depth)) + "_" + str(config.v_grid_extents[2]) + "X" + str(config.n_cells_per_tile[2]*config.n_tiles[2]) #config.io_outdir + "_c_" + str(round(config.cfl)) + "_R_" + str(round(config.skin_depth))
 
     config.omega_p = config.cfl / config.skin_depth
 
-    config.n_laps = 250.0 / config.omega_p
+    config.n_laps = 500.0 / config.omega_p
 
     config.field_propagator = "fdtd2"
-    config.m0 = 1.0
-    config.n0 = 1.0
     config.q0 = config.omega_p * np.sqrt(config.m0/config.n0) # q = sqrt(omega_p^2*m/n)
     v_T = config.u_max[2]/config.v_grid_extents[2]*10.0
     v_0 = np.sqrt(8.0)#config.u_max[2]/6.0

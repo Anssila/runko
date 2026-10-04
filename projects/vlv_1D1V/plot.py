@@ -96,7 +96,7 @@ def plot_energy(datas, fig, ax : plt.Axes, names, configs : list[runko.Configura
         log_data = np.log(y_data)
         log_analytic = np.log(analytic_y)
         # index = len(x_data)//2
-        normal_t = 110.0
+        normal_t = 70.0
         index = 0
         for j in range(len(x_data)):
             if x_data[j] >= normal_t/config.omega_p:
@@ -123,7 +123,7 @@ def plot_energy(datas, fig, ax : plt.Axes, names, configs : list[runko.Configura
         # ax.semilogy(x_data * config.omega_p, analytic_y, label=names[i] + "_analytic")
 
     ax.set_title("Sähkökentän keskimääräinen energiatiheys ajan funktiona")
-    ax.set_xlabel("Aika ($\\omega_p^{-1}$)")
+    ax.set_xlabel(r'Aika, $t$ ($\omega_\mathrm{p}^{-1}$)') #""
     ax.set_ylabel("Sähkökentän energia $\\ln{\\left(\\langle \\hat{E}^2 \\rangle / 8\\pi\\right)}$")
 
 if __name__ == "__main__":

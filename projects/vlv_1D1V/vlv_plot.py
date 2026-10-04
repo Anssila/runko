@@ -69,9 +69,9 @@ if __name__ == "__main__":
         full_data = np.rot90(np.concatenate(datas, axis=0))
         im.set_data(full_data)
 
-    ani = animation.FuncAnimation(fig, update, frames=list(range(max-min))[::2], interval=50)
+    ani = animation.FuncAnimation(fig, update, frames=list(range(max-min))[::], interval=100)
     fig.colorbar(im, ax =ax, label="Lukumäärätiheys")
     fig.set_size_inches(10.0, 5.0)
     plt.show()
-    # ani.save(f"{filepath}/anim2.gif", writer="pillow", dpi=400)
+    # ani.save(f"{filepath}/animation.gif", writer="pillow", dpi=400)
     # ani.save(f"{filepath}/{min}.png", writer="pillow", dpi=400)
